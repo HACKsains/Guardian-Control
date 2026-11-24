@@ -108,9 +108,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['local_login'])) {
     }
 }
 
-$csrfToken     = gc_get_csrf_token();
-$nextParam     = isset($_GET['next']) ? (string)$_GET['next'] : '';
-$showEmergency = isset($_GET['emergency_admin']) || !$ssoConfigured;
+$csrfToken      = gc_get_csrf_token();
+$nextParam      = isset($_GET['next']) ? (string)$_GET['next'] : '';
+$showEmergency  = isset($_GET['emergency_admin']) || GC_IS_LOCAL || !$ssoConfigured;
+$loginActionUrl = GC_IS_LOCAL ? (BASE_URL . '/login.php') : (BASE_URL . '/login');
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -620,21 +621,21 @@ $showEmergency = isset($_GET['emergency_admin']) || !$ssoConfigured;
                     </div>
                 <?php endif; ?>
 
-                <a href="<?= gc_e(BASE_URL . '/login?action=sso') ?>" id="btnSsoLogin" class="btn-submit <?= $ssoConfigured ? '' : 'is-disabled' ?>">
+                <a href="<?= gc_e($loginActionUrl . '?action=sso') ?>" id="btnSsoLogin" class="btn-submit">
                     <iconify-icon icon="solar:shield-keyhole-bold" width="19"></iconify-icon>
                     <span>Masuk dengan Margo One SSO</span>
                     <iconify-icon icon="solar:arrow-right-bold" width="17"></iconify-icon>
                 </a>
                 <?php if (!$ssoConfigured): ?>
                     <p style="font-size:0.72rem;color:#64748B;text-align:center;margin-top:6px;">
-                        SSO siap diaktifkan via <code>config.local.php</code> (OAuth 2.0 + RS256).
+                        Lengkapi kunci klien Margo One SSO di <code>config.local.php</code>.
                     </p>
                 <?php endif; ?>
 
                 <?php if ($localEnabled && $showEmergency): ?>
                     <div class="sso-divider"><span>atau login admin lokal / darurat</span></div>
 
-                    <form method="POST" action="<?= gc_e(BASE_URL . '/login') ?>" id="loginForm" autocomplete="on" novalidate>
+                    <form method="POST" action="<?= gc_e($loginActionUrl) ?>" id="loginForm" autocomplete="on" novalidate>
                         <input type="hidden" name="_csrf_token" value="<?= gc_e($csrfToken) ?>">
                         <input type="hidden" name="local_login" value="1">
                         <input type="hidden" name="next" value="<?= gc_e($nextParam) ?>">
@@ -672,7 +673,7 @@ $showEmergency = isset($_GET['emergency_admin']) || !$ssoConfigured;
                     </form>
                 <?php elseif ($localEnabled): ?>
                     <div style="text-align:center;margin-top:16px;">
-                        <a href="<?= gc_e(BASE_URL . '/login?emergency_admin=1') ?>" style="font-size:0.8rem;color:#0D7A87;font-weight:700;text-decoration:none;">
+                        <a href="<?= gc_e($loginActionUrl . '?emergency_admin=1') ?>" style="font-size:0.8rem;color:#0D7A87;font-weight:700;text-decoration:none;">
                             Jalur Darurat Admin Lokal →
                         </a>
                     </div>

@@ -126,12 +126,12 @@ define('GC_LOCAL_CACHE_DIR', BASE_PATH . '/cache');
 // ==============================================================================
 // 4. INTEGRASI MARGO ONE SSO (OAUTH 2.0 + PKCE S256 + RS256 + GLOBAL SLO)
 // ==============================================================================
-define('GC_SSO_ENABLED', (bool)gc_cfg('sso_enabled', !$gcIsLocal));
+define('GC_SSO_ENABLED', (bool)gc_cfg('sso_enabled', true));
 define('GC_SSO_URL', rtrim((string)gc_cfg('sso_url', 'https://margo-one.ilmuna.my.id'), '/'));
 define('GC_SSO_CLIENT_SLUG', gc_cfg('sso_client_slug', 'guardian-control'));
-define('GC_SSO_PUBLIC_KEY', gc_cfg('sso_public_key', ''));
-define('GC_SSO_PRIVATE_KEY', gc_cfg('sso_private_key', ''));
-define('GC_SSO_REDIRECT_URI', gc_cfg('sso_redirect_uri', BASE_URL . '/sso-callback'));
+define('GC_SSO_PUBLIC_KEY', gc_cfg('sso_public_key', 'pk_sso_9c4e2a81f0b73d5e6a19c84f2b70e31a'));
+define('GC_SSO_PRIVATE_KEY', gc_cfg('sso_private_key', 'sk_sso_4f8b1c72e90a53d6b21f84e0a7c59d31e6b40a28f7c319d5e2a86b40c1f973a2'));
+define('GC_SSO_REDIRECT_URI', gc_cfg('sso_redirect_uri', $gcIsLocal ? (BASE_URL . '/sso-callback.php') : (BASE_URL . '/sso-callback')));
 define('GC_SSO_ALLOWED_ROLES', ['admin']);
 define('GC_SSO_SSL_VERIFY', (bool)gc_cfg('sso_ssl_verify', !$gcIsLocal));
 
