@@ -61,7 +61,8 @@ if ($method === 'POST') {
     if ($action === 'purge_cache') {
         $forceAll = !empty($input['force_all']);
         $res = gc_waf_purge_cache(7, $forceAll);
-        $summary = 'Purge ' . ($forceAll ? 'Penuh' : '>7 Hari') . ': ' . ($res['purged_files'] ?? 0) . ' file dibersihkan.';
+        $purgedCnt = (int)($res['purged_files'] ?? $res['files_purged'] ?? 0);
+        $summary = 'Purge ' . ($forceAll ? 'Penuh' : '>7 Hari') . ': ' . $purgedCnt . ' file dibersihkan.';
         gc_set_setting($pdo, 'purger_last_run', ['at' => date('Y-m-d H:i:s'), 'summary' => $summary], $admin['username']);
         gc_audit_log('waf_cache_purge', $forceAll ? 'force_all' : '7d', $res, $admin['username']);
         gc_json_response([

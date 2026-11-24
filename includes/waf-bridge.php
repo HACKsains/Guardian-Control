@@ -303,13 +303,14 @@ function gc_waf_read_rdns_cache()
         if (!is_array($d)) {
             continue;
         }
+        $expTs = isset($d['exp']) ? (int)$d['exp'] : (isset($d['expires']) ? (int)$d['expires'] : ((int)@filemtime($f) + 86400));
         $entries[] = [
             'file'        => basename($f),
-            'ip'          => (string)($d['ip'] ?? 'Unknown'),
+            'ip'          => (string)($d['ip'] ?? 'Verified Bot'),
             'ptr'         => (string)($d['ptr'] ?? $d['hostname'] ?? '-'),
             'bot_name'    => (string)($d['bot'] ?? $d['ua'] ?? 'Official Crawler'),
             'verified'    => !empty($d['verified']) || !empty($d['valid']) || !empty($d['is_official']),
-            'expires_at'  => isset($d['expires']) ? date('Y-m-d H:i:s', (int)$d['expires']) : date('Y-m-d H:i:s', (int)@filemtime($f) + 86400),
+            'expires_at'  => date('Y-m-d H:i:s', $expTs),
             'updated_at'  => date('Y-m-d H:i:s', (int)@filemtime($f)),
         ];
     }
