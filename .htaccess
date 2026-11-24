@@ -1,0 +1,60 @@
+# ==============================================================================
+# GUARDIAN CONTROL — PRODUCTION & LOCAL .HTACCESS (guardian-dome.ilmuna.my.id)
+# Kompatibel LiteSpeed / Apache / cPanel (PHP ea-php74 s/d 8.3)
+# ==============================================================================
+
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Permissions-Policy "geolocation=(), camera=(), microphone=(), payment=()"
+    Header always set X-XSS-Protection "1; mode=block"
+</IfModule>
+
+# Pengecualian auto_prepend_file pada endpoint OAuth2 callback & Global SLO webhook
+<FilesMatch "^(sso-callback|sso-logout-webhook|logout)\.php$">
+    <IfModule lsapi_module>
+        php_value auto_prepend_file none
+    </IfModule>
+    <IfModule php7_module>
+        php_value auto_prepend_file none
+    </IfModule>
+</FilesMatch>
+
+Options -Indexes
+
+# Proteksi mutlak file sensitif, konfigurasi rahasia, cache, dan dokumentasi
+<FilesMatch "^.*(\.env|\.sqlite|\.git|\.user\.ini|php\.ini|config\.local\.php|config\.local\.example\.php|\.[hH][tT][aApP].*|((?:error_log|readme|blueprint|implementation_plan|license|changelog)\.(?:php|md|log|txt|htm|html)))$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order deny,allow
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Blokir akses HTTP langsung ke folder cron/, cache/, sdk/, includes/
+    RewriteRule ^(cron|cache|sdk|includes)/ - [F,L]
+
+    # Passthrough Authorization header
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+    # Jangan rewrite jika file atau folder fisik ada
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # Clean URL tanpa .php (/dashboard, /login, /logout, /sso-callback, /sso-logout-webhook)
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME}\.php -f
+    RewriteRule ^(.+?)/?$ $1.php [L,QSA]
+
+    RewriteRule ^index\.php$ - [L]
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule . index.php [L]
+</IfModule>

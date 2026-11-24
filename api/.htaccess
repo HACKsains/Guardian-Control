@@ -1,0 +1,15 @@
+# GUARDIAN CONTROL — API SECURITY HEADERS & NO-CACHE
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
+    Header always set X-Robots-Tag "noindex, nofollow"
+</IfModule>
+
+<IfModule lsapi_module>
+    php_value auto_prepend_file none
+</IfModule>
+<IfModule php7_module>
+    php_value auto_prepend_file none
+</IfModule>
+
+Options -Indexes

@@ -1,0 +1,7 @@
+config.local.php
+cache/*
+!cache/.htaccess
+error_log
+*.log
+.DS_Store
+Thumbs.db
