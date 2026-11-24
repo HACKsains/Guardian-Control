@@ -810,7 +810,7 @@ $loginActionUrl = GC_IS_LOCAL ? (BASE_URL . '/login.php') : (BASE_URL . '/login'
                 .then(function (r) { return r.json(); })
                 .then(function (res) {
                     if (res && res.success && res.redirect) {
-                        if (window.Ilmuna) window.Ilmuna.toast({ type: 'success', title: 'Autentikasi Berhasil', message: 'Memasuki Pusat Komando SEC-OPS...' });
+                        if (window.Ilmuna) window.Ilmuna.toast('success', 'Autentikasi Berhasil', 'Memasuki Pusat Komando SEC-OPS...');
                         if (slidePanel) slidePanel.classList.add('slide-out-behind');
                         if (pageTransition) pageTransition.classList.add('active');
                         setTimeout(function () { window.location.href = res.redirect; }, 440);

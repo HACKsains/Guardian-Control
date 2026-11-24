@@ -34,24 +34,25 @@
     }
 
     function toast(type, title, msg) {
+        var t = (type === 'danger') ? 'error' : (type || 'info');
         if (window.Ilmuna && typeof window.Ilmuna.toast === 'function') {
-            window.Ilmuna.toast({ type: type, title: title, message: msg || '' });
-        } else if (window.Ilmuna && typeof window.Ilmuna[type] === 'function') {
-            window.Ilmuna[type](title, msg || '');
+            window.Ilmuna.toast(t, String(title || ''), String(msg || ''));
         }
     }
 
     function askConfirm(opts, onYes) {
+        var t = (opts.type === 'danger') ? 'error' : (opts.type || 'warning');
         if (window.Ilmuna && typeof window.Ilmuna.confirm === 'function') {
-            window.Ilmuna.confirm({
-                title: opts.title || 'Konfirmasi Tindakan',
-                message: opts.message || 'Apakah Anda yakin melanjutkan?',
-                confirmText: opts.confirmText || 'Ya, Lanjutkan',
-                cancelText: opts.cancelText || 'Batal',
-                type: opts.type || 'warning',
-                onConfirm: onYes
+            window.Ilmuna.confirm(
+                t,
+                opts.title || 'Konfirmasi Tindakan',
+                opts.message || 'Apakah Anda yakin melanjutkan?',
+                opts.confirmText || 'Ya, Lanjutkan',
+                opts.cancelText || 'Batal'
+            ).then(function (ok) {
+                if (ok && typeof onYes === 'function') onYes();
             });
-        } else {
+        } else if (typeof onYes === 'function') {
             onYes();
         }
     }

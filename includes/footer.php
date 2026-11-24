@@ -36,8 +36,10 @@ $gcJsVer = @filemtime(BASE_PATH . '/assets/js/guardian-control.js') ?: '1';
             if (entry) entry.classList.remove('is-done');
             setTimeout(function () { window.location.href = logoutUrl; }, 440);
         };
-        if (window.Ilmuna && typeof window.Ilmuna.confirm === 'function') {
-            window.Ilmuna.confirm({
+        if (window.Ilmuna && typeof window.Ilmuna.logout === 'function') {
+            window.Ilmuna.logout({
+                url: logoutUrl,
+                redirect: false,
                 title: 'Keluar dari Guardian Control?',
                 message: 'Sesi Administrator SEC-OPS akan diakhiri secara aman (Global SLO bila terhubung Margo One).',
                 confirmText: 'Ya, Keluar',
