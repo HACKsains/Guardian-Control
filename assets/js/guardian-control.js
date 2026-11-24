@@ -601,7 +601,12 @@
             return;
         }
         tbody.innerHTML = rows.map(function (u) {
-            var upBadge = u.is_up ? '<span class="gc-badge gc-badge-ok">UP · ' + esc(u.http_code) + '</span>' : '<span class="gc-badge gc-badge-crit">DOWN · ' + esc(u.http_code) + '</span>';
+            var isWafShield = Number(u.is_up) === 1 && (Number(u.http_code) === 403 || Number(u.http_code) === 503);
+            var upBadge = isWafShield
+                ? '<span class="gc-badge gc-badge-info" title="' + esc(u.error_message || 'WAF Shield Aktif') + '">UP · WAF ' + esc(u.http_code) + '</span>'
+                : (Number(u.is_up) === 1
+                    ? '<span class="gc-badge gc-badge-ok">UP · ' + esc(u.http_code) + '</span>'
+                    : '<span class="gc-badge gc-badge-crit">DOWN · ' + esc(u.http_code) + '</span>');
             var sslTxt = u.ssl_days_left != null ? (esc(u.ssl_days_left) + ' hari' + (u.ssl_issuer ? ' (' + esc(u.ssl_issuer) + ')' : '')) : 'N/A';
             var hdrHtml = '--';
             if (u.security_headers) {

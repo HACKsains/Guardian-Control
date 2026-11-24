@@ -495,6 +495,22 @@ function gc_inspect_ssl_cert($host, $timeout = 5)
     return $result;
 }
 
+function gc_get_waf_secret_salt()
+{
+    static $salt = null;
+    if ($salt !== null) {
+        return $salt;
+    }
+    $salt = 'GD_ILMUNA_SECOPS_SHIELD_2026_x8b2ec91a';
+    if (is_file(GC_WAF_FILE)) {
+        $head = @file_get_contents(GC_WAF_FILE, false, null, 0, 8192);
+        if (is_string($head) && preg_match("/const\s+SECRET_SALT\s*=\s*'([^']+)'/", $head, $m)) {
+            $salt = $m[1];
+        }
+    }
+    return $salt;
+}
+
 /**
  * 6. Subdomain HTTP Uptime, TTFB Latency, SSL & Security Headers Audit
  */
@@ -503,18 +519,22 @@ function gc_check_ecosystem_uptime(PDO $pdo = null, $saveToDb = false)
     $targets = gc_get_uptime_targets();
     $results = [];
     $sslCache = [];
+    $wafSalt  = gc_get_waf_secret_salt();
 
     foreach ($targets as $t) {
         $url  = (string)$t['url'];
-        $host = (string)($t['host'] ?? parse_url($url, PHP_URL_HOST));
+        $host = strtolower((string)($t['host'] ?? parse_url($url, PHP_URL_HOST)));
         $respHeaders = [];
 
         $httpCode = 0;
         $ttfbMs   = 0;
         $totalMs  = 0;
         $errMsg   = null;
+        $body     = '';
 
         if (function_exists('curl_init')) {
+            $tsNow = (string)time();
+            $sig   = hash_hmac('sha256', 'health|' . $tsNow . '|' . $host, $wafSalt);
             $ch = curl_init($url);
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
@@ -523,7 +543,12 @@ function gc_check_ecosystem_uptime(PDO $pdo = null, $saveToDb = false)
                 CURLOPT_MAXREDIRS      => 3,
                 CURLOPT_TIMEOUT        => 8,
                 CURLOPT_CONNECTTIMEOUT => 5,
-                CURLOPT_USERAGENT      => 'GuardianControl-Monitor/1.0 (+https://guardian-dome.ilmuna.my.id)',
+                CURLOPT_USERAGENT      => 'Mozilla/5.0 (compatible; GuardianControl-HealthCheck/1.0; +https://guardian-dome.ilmuna.my.id)',
+                CURLOPT_HTTPHEADER     => [
+                    'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language: id-ID,id;q=0.9,en;q=0.8',
+                    'X-GD-Internal-Health: ' . $tsNow . '.' . $sig,
+                ],
                 CURLOPT_SSL_VERIFYPEER => false,
                 CURLOPT_SSL_VERIFYHOST => 0,
                 CURLOPT_HEADERFUNCTION => function ($chObj, $line) use (&$respHeaders) {
@@ -535,12 +560,14 @@ function gc_check_ecosystem_uptime(PDO $pdo = null, $saveToDb = false)
                     return $len;
                 },
             ]);
-            $body = curl_exec($ch);
+            $rawBody  = curl_exec($ch);
             $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
             $ttfbMs   = (int)round((float)curl_getinfo($ch, CURLINFO_STARTTRANSFER_TIME) * 1000);
             $totalMs  = (int)round((float)curl_getinfo($ch, CURLINFO_TOTAL_TIME) * 1000);
-            if ($body === false) {
+            if ($rawBody === false) {
                 $errMsg = curl_error($ch);
+            } else {
+                $body = (string)$rawBody;
             }
             curl_close($ch);
         } else {
@@ -566,7 +593,12 @@ function gc_check_ecosystem_uptime(PDO $pdo = null, $saveToDb = false)
             }
         }
 
-        $isUp = ($httpCode >= 200 && $httpCode < 400);
+        $wafProtected403 = ($httpCode === 403 || $httpCode === 503)
+            && (stripos($body, 'Guardian Dome') !== false || isset($respHeaders['x-guardian-dome']) || isset($respHeaders['x-waf-shield']));
+        $isUp = ($httpCode >= 200 && $httpCode < 400) || $wafProtected403;
+        if ($wafProtected403 && $errMsg === null) {
+            $errMsg = 'WAF Guardian Dome aktif (unggah guardian-dome-waf.php terbaru untuk bypass health-check 200 OK)';
+        }
         $item = [
             'target_name'      => (string)$t['name'],
             'host'             => $host,
