@@ -86,13 +86,13 @@ if (!defined('BASE_URL')) {
 define('APP_LOGO_URL', BASE_URL . '/assets/images/Guardian_Dome.png');
 
 // ==============================================================================
-// 2. DATABASE DEDICATED (100% TERPISAH: uofruaju_guardian_control)
+// 2. DATABASE DEDICATED (100% TERPISAH: uofruaju_guardian-dome)
 // ==============================================================================
-define('GC_DB_HOST', gc_cfg('db_host', '127.0.0.1'));
+define('GC_DB_HOST', gc_cfg('db_host', $gcIsLocal ? '127.0.0.1' : 'localhost'));
 define('GC_DB_PORT', (int)gc_cfg('db_port', 3306));
-define('GC_DB_NAME', gc_cfg('db_name', 'uofruaju_guardian_control'));
-define('GC_DB_USER', gc_cfg('db_user', $gcIsLocal ? 'root' : 'uofruaju_guardian_control'));
-define('GC_DB_PASS', gc_cfg('db_pass', ''));
+define('GC_DB_NAME', gc_cfg('db_name', 'uofruaju_guardian-dome'));
+define('GC_DB_USER', gc_cfg('db_user', $gcIsLocal ? 'root' : 'uofruaju_guardian-dome'));
+define('GC_DB_PASS', gc_cfg('db_pass', $gcIsLocal ? '' : 'Guardian28@'));
 
 // ==============================================================================
 // 3. LOKASI ENGINE GUARDIAN DOME WAF (RELATIVE ../guardian-dome + FALLBACK)

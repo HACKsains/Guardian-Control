@@ -40,14 +40,15 @@ function getDBConnection()
     try {
         $pdo = new PDO($dsn, GC_DB_USER, GC_DB_PASS, $options);
     } catch (PDOException $e) {
-        // Di lingkungan lokal Laragon, otomatis buat database dedicated jika belum ada
-        if (GC_IS_LOCAL && (strpos($e->getMessage(), 'Unknown database') !== false || (int)$e->getCode() === 1049)) {
-            $dsnNoDb = sprintf('mysql:host=%s;port=%d;charset=utf8mb4', GC_DB_HOST, GC_DB_PORT);
-            $tmpPdo = new PDO($dsnNoDb, GC_DB_USER, GC_DB_PASS, $options);
+        // Di lingkungan lokal Laragon, otomatis fallback ke root + buat database dedicated jika belum ada
+        if (GC_IS_LOCAL) {
+            $dsnNoDb = sprintf('mysql:host=127.0.0.1;port=%d;charset=utf8mb4', GC_DB_PORT);
+            $tmpPdo = new PDO($dsnNoDb, 'root', '', $options);
             $safeDb = str_replace('`', '', GC_DB_NAME);
             $tmpPdo->exec("CREATE DATABASE IF NOT EXISTS `{$safeDb}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
             $tmpPdo = null;
-            $pdo = new PDO($dsn, GC_DB_USER, GC_DB_PASS, $options);
+            $dsnLocal = sprintf('mysql:host=127.0.0.1;port=%d;dbname=%s;charset=utf8mb4', GC_DB_PORT, GC_DB_NAME);
+            $pdo = new PDO($dsnLocal, 'root', '', $options);
         } else {
             throw $e;
         }

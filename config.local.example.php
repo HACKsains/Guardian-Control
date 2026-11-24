@@ -11,10 +11,10 @@
 
 return [
     // 1. Database Dedicated (WAJIB TERPISAH dari SSO & Learn)
-    'db_host' => '127.0.0.1',
+    'db_host' => 'localhost',
     'db_port' => 3306,
-    'db_name' => 'uofruaju_guardian_control',
-    'db_user' => 'uofruaju_guardian_control',
+    'db_name' => 'uofruaju_guardian-dome',
+    'db_user' => 'uofruaju_guardian-dome',
     'db_pass' => 'GANTI_PASSWORD_DB_PRODUKSI',
 
     // 2. Domain & Base URL (kosongkan untuk auto-detect)
