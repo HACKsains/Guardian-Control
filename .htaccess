@@ -11,8 +11,8 @@
     Header always set X-XSS-Protection "1; mode=block"
 </IfModule>
 
-# Pengecualian auto_prepend_file pada endpoint OAuth2 callback & Global SLO webhook
-<FilesMatch "^(sso-callback|sso-logout-webhook|logout)\.php$">
+# Pengecualian auto_prepend_file pada endpoint OAuth2 callback, Global SLO webhook & GitHub deploy webhook
+<FilesMatch "^(sso-callback|sso-logout-webhook|logout|deploy)\.php$">
     <IfModule lsapi_module>
         php_value auto_prepend_file none
     </IfModule>
