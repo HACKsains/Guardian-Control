@@ -279,12 +279,14 @@ function gc_get_json_input()
  */
 function gc_set_flash_alert($type, $title, $message)
 {
-    if (!isset($_SESSION['ilmuna_alerts']) || !is_array($_SESSION['ilmuna_alerts'])) {
-        $_SESSION['ilmuna_alerts'] = [];
+    if (!isset($_SESSION['_ilmuna_flash']) || !is_array($_SESSION['_ilmuna_flash'])) {
+        $_SESSION['_ilmuna_flash'] = [];
     }
-    $_SESSION['ilmuna_alerts'][] = [
-        'type'    => (string)$type,
-        'title'   => (string)$title,
-        'message' => (string)$message,
+    $_SESSION['_ilmuna_flash'][] = [
+        'mode'     => 'toast',
+        'type'     => (string)$type,
+        'title'    => (string)$title,
+        'message'  => (string)$message,
+        'duration' => 4500,
     ];
 }
