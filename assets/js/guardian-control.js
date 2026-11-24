@@ -639,14 +639,40 @@
     }
 
     // ==========================================================================
-    // TAB 5: CENTRALIZED ERROR LOGS
+    // TAB 5: CENTRALIZED ERROR LOGS (BULK ACTION + ACTIVE/RESOLVED WORKFLOW)
     // ==========================================================================
+    function getSelectedErrIds() {
+        return Array.from(document.querySelectorAll('.err-row-check:checked')).map(function (c) { return parseInt(c.value, 10); }).filter(Boolean);
+    }
+
+    function updateErrSelectedCount() {
+        var cnt = getSelectedErrIds().length;
+        setText('errSelectedBadge', cnt + ' dipilih');
+    }
+
+    function toggleAllErrChecks(checked) {
+        document.querySelectorAll('.err-row-check').forEach(function (c) { c.checked = !!checked; });
+        updateErrSelectedCount();
+    }
+
     async function loadErrorLogs() {
-        var lvl = document.getElementById('errLevelFilter').value;
+        var lvlEl = document.getElementById('errLevelFilter');
+        var stEl  = document.getElementById('errStatusFilter');
+        var lvl   = lvlEl ? lvlEl.value : 'all';
+        var st    = stEl ? stEl.value : 'active';
+        var chkAll = document.getElementById('errCheckAll');
+        if (chkAll) chkAll.checked = false;
+
         try {
-            var d = await apiFetch('error-logs.php?source=' + encodeURIComponent(state.errSource) + '&level=' + encodeURIComponent(lvl));
+            var d = await apiFetch('error-logs.php?source=' + encodeURIComponent(state.errSource) + '&level=' + encodeURIComponent(lvl) + '&status=' + encodeURIComponent(st));
             if (!d) return;
             state.errorsCache = d.errors || [];
+
+            if (d.counts) {
+                setText('errCountActive', 'Aktif: ' + (d.counts.active || 0));
+                setText('errCountResolved', 'Selesai: ' + (d.counts.resolved || 0));
+            }
+            updateErrSelectedCount();
 
             var pillBox = document.getElementById('errSourcePills');
             var pills = '<button type="button" class="gc-pill-btn ' + (state.errSource === 'all' ? 'is-active' : '') + '" onclick="GC.selectErrorSource(\'all\')">Semua Aplikasi</button>';
@@ -660,20 +686,25 @@
 
             var tbody = document.getElementById('errorLogsBody');
             if (!state.errorsCache.length) {
-                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:#059669;font-weight:600;">✓ Bersih! Tidak ada error tercatat untuk filter ini.</td></tr>';
+                var emptyText = st === 'active'
+                    ? '✓ Bersih! Semua error pada filter ini sudah selesai atau tidak ada error aktif.'
+                    : 'Tidak ada catatan error pada filter status ini.';
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:#059669;font-weight:600;">' + emptyText + '</td></tr>';
                 return;
             }
             tbody.innerHTML = state.errorsCache.map(function (e, idx) {
+                var isRes = Number(e.is_resolved) === 1;
                 var bCls = (e.level === 'fatal' || e.level === 'sql') ? 'gc-badge-crit' : (e.level === 'exception' || e.level === 'warning' ? 'gc-badge-warn' : 'gc-badge-info');
-                return '<tr style="' + (e.is_resolved == 1 ? 'opacity:0.55;' : '') + '">' +
-                    '<td data-label="Sumber & Level"><strong>' + esc(e.app_source) + '</strong><div><span class="gc-badge ' + bCls + '">' + esc(e.level) + '</span></div></td>' +
-                    '<td data-label="Pesan & Lokasi"><div style="font-weight:600;font-size:0.84rem;">' + esc(String(e.message || '').split('\n')[0]).slice(0, 140) + '</div>' +
+                return '<tr data-err-id="' + esc(e.id) + '" style="' + (isRes ? 'opacity:0.68;' : '') + '">' +
+                    '<td data-label="Pilih"><input type="checkbox" class="err-row-check" value="' + esc(e.id) + '" onchange="GC.updateErrSelectedCount()"></td>' +
+                    '<td data-label="Sumber & Level"><strong>' + esc(e.app_source) + '</strong><div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px;"><span class="gc-badge ' + bCls + '">' + esc(e.level) + '</span>' + (isRes ? '<span class="gc-badge gc-badge-ok">SELESAI ✓</span>' : '') + '</div></td>' +
+                    '<td data-label="Pesan & Lokasi"><div style="font-weight:600;font-size:0.84rem;' + (isRes ? 'text-decoration:line-through;color:var(--gc-muted);' : '') + '">' + esc(String(e.message || '').split('\n')[0]).slice(0, 140) + '</div>' +
                         (e.file_path ? '<div class="gc-mono" style="font-size:0.74rem;color:var(--gc-muted);">' + esc(e.file_path) + (e.line_num ? ':' + esc(e.line_num) : '') + '</div>' : '') + '</td>' +
                     '<td data-label="Frekuensi"><span class="gc-badge gc-badge-navy">' + esc(e.hit_count) + 'x</span></td>' +
                     '<td data-label="Terakhir">' + esc(e.last_seen_at) + '</td>' +
                     '<td data-label="Aksi" style="display:flex;gap:6px;flex-wrap:wrap;">' +
                         '<button type="button" class="gc-btn gc-btn-ghost gc-btn-sm" onclick="GC.showErrorDetail(' + idx + ')">Trace</button>' +
-                        '<button type="button" class="gc-btn gc-btn-teal gc-btn-sm" onclick="GC.toggleErrorResolve(' + e.id + ', ' + (e.is_resolved == 1 ? 0 : 1) + ', this)">' + (e.is_resolved == 1 ? 'Buka' : 'Selesai') + '</button>' +
+                        '<button type="button" class="gc-btn ' + (isRes ? 'gc-btn-gold' : 'gc-btn-teal') + ' gc-btn-sm" onclick="GC.toggleErrorResolve(' + e.id + ', ' + (isRes ? 0 : 1) + ', this)">' + (isRes ? 'Buka' : 'Selesai') + '</button>' +
                     '</td></tr>';
             }).join('');
         } catch (err) {
@@ -699,16 +730,71 @@
     }
 
     async function toggleErrorResolve(id, resolved, btn) {
+        var stEl = document.getElementById('errStatusFilter');
+        var curSt = stEl ? stEl.value : 'active';
         try {
             var d = await apiFetch('error-logs.php', { method: 'POST', body: { action: 'resolve', id: id, resolved: resolved } });
             if (d) {
-                toast('success', 'Status Diperbarui', d.message);
                 var tr = btn ? btn.closest('tr') : null;
-                if (tr) tr.classList.add('row-flash');
-                loadErrorLogs();
+                var shouldSlideOut = (curSt === 'active' && resolved === 1) || (curSt === 'resolved' && resolved === 0);
+                if (tr && shouldSlideOut) {
+                    tr.classList.add('row-smooth-out');
+                    setTimeout(function () { loadErrorLogs(); }, 270);
+                } else {
+                    if (tr) tr.classList.add('row-flash');
+                    loadErrorLogs();
+                }
+                toast('success', resolved ? 'Ditandai Selesai' : 'Dibuka Kembali', d.message);
                 loadOverview();
             }
         } catch (err) { toast('error', 'Gagal', err.message); }
+    }
+
+    function bulkErrorAction(action) {
+        var ids = getSelectedErrIds();
+        if (!ids.length) {
+            toast('warning', 'Belum Ada Baris Dipilih', 'Centang minimal 1 error pada kolom paling kiri terlebih dahulu.');
+            return;
+        }
+        var labelMap = {
+            bulk_resolve: { title: 'Tandai ' + ids.length + ' Error Selesai?', msg: 'Error terpilih akan dipindahkan dari daftar Aktif ke arsip Sudah Selesai.', btn: 'Ya, Tandai Selesai', type: 'warning' },
+            bulk_reopen:  { title: 'Buka Kembali ' + ids.length + ' Error?', msg: 'Error terpilih akan dikembalikan ke daftar Belum Selesai (Aktif).', btn: 'Ya, Buka Kembali', type: 'info' },
+            bulk_delete:  { title: 'Hapus ' + ids.length + ' Snapshot Error?', msg: 'Catatan error terpilih akan dihapus dari database Guardian Control (tidak menghapus file log asli).', btn: 'Ya, Hapus Terpilih', type: 'danger' }
+        };
+        var cfg = labelMap[action] || labelMap.bulk_resolve;
+        askConfirm({ title: cfg.title, message: cfg.msg, confirmText: cfg.btn, type: cfg.type }, async function () {
+            try {
+                var d = await apiFetch('error-logs.php', { method: 'POST', body: { action: action, ids: ids } });
+                if (d) {
+                    ids.forEach(function (id) {
+                        var tr = document.querySelector('tr[data-err-id="' + id + '"]');
+                        if (tr) tr.classList.add('row-smooth-out');
+                    });
+                    toast('success', 'Bulk Action Berhasil', d.message);
+                    setTimeout(function () { loadErrorLogs(); loadOverview(); }, 280);
+                }
+            } catch (err) { toast('error', 'Bulk Action Gagal', err.message); }
+        });
+    }
+
+    function resolveAllErrors() {
+        var lvlEl = document.getElementById('errLevelFilter');
+        var lvl = lvlEl ? lvlEl.value : 'all';
+        askConfirm({
+            title: 'Tandai Semua Error Aktif Selesai?',
+            message: 'Seluruh error aktif pada filter aplikasi (' + state.errSource + ') & level (' + lvl + ') akan ditandai selesai sekaligus.',
+            confirmText: 'Ya, Selesaikan Semua',
+            type: 'warning'
+        }, async function () {
+            try {
+                var d = await apiFetch('error-logs.php', { method: 'POST', body: { action: 'resolve_all', source: state.errSource, level: lvl } });
+                if (d) {
+                    toast('success', 'Semua Selesai', d.message);
+                    loadErrorLogs();
+                    loadOverview();
+                }
+            } catch (err) { toast('error', 'Gagal', err.message); }
+        });
     }
 
     function downloadActiveErrorLog() {
@@ -1255,6 +1341,10 @@
         selectErrorSource: selectErrorSource,
         showErrorDetail: showErrorDetail,
         toggleErrorResolve: toggleErrorResolve,
+        toggleAllErrChecks: toggleAllErrChecks,
+        updateErrSelectedCount: updateErrSelectedCount,
+        bulkErrorAction: bulkErrorAction,
+        resolveAllErrors: resolveAllErrors,
         downloadActiveErrorLog: downloadActiveErrorLog,
         truncateActiveErrorLog: truncateActiveErrorLog,
         setVisitorRange: setVisitorRange,

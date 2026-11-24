@@ -424,6 +424,11 @@ require_once BASE_PATH . '/includes/header.php';
         <div class="gc-card-head">
             <h2 class="gc-card-title"><iconify-icon icon="solar:bug-bold"></iconify-icon> Centralized Error Log Drill-Down (Lintas Aplikasi)</h2>
             <div class="gc-toolbar" style="margin:0;">
+                <select id="errStatusFilter" class="gc-select" onchange="GC.loadErrorLogs()">
+                    <option value="active" selected>Belum Selesai (Aktif)</option>
+                    <option value="resolved">Sudah Selesai</option>
+                    <option value="all">Semua Status</option>
+                </select>
                 <select id="errLevelFilter" class="gc-select" onchange="GC.loadErrorLogs()">
                     <option value="all">Semua Level</option>
                     <option value="fatal">FATAL / PARSE</option>
@@ -441,14 +446,37 @@ require_once BASE_PATH . '/includes/header.php';
             </div>
         </div>
 
-        <div class="gc-pill-group" id="errSourcePills" style="margin-bottom:14px;">
+        <div class="gc-pill-group" id="errSourcePills" style="margin-bottom:12px;">
             <button type="button" class="gc-pill-btn is-active" data-err-src="all" onclick="GC.selectErrorSource('all')">Semua Aplikasi</button>
+        </div>
+
+        <div class="gc-toolbar" id="errBulkToolbar" style="padding:10px 12px;border-radius:14px;background:rgba(29,59,94,0.04);border:1px solid var(--gc-border);margin-bottom:14px;justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <span class="gc-badge gc-badge-navy" id="errSelectedBadge">0 dipilih</span>
+                <span class="gc-badge gc-badge-crit" id="errCountActive">Aktif: 0</span>
+                <span class="gc-badge gc-badge-ok" id="errCountResolved">Selesai: 0</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <button type="button" class="gc-btn gc-btn-teal gc-btn-sm" onclick="GC.bulkErrorAction('bulk_resolve')">
+                    <iconify-icon icon="solar:check-read-bold" width="15"></iconify-icon> Selesai Terpilih
+                </button>
+                <button type="button" class="gc-btn gc-btn-ghost gc-btn-sm" onclick="GC.bulkErrorAction('bulk_reopen')">
+                    <iconify-icon icon="solar:restart-bold" width="15"></iconify-icon> Buka Kembali
+                </button>
+                <button type="button" class="gc-btn gc-btn-danger gc-btn-sm" onclick="GC.bulkErrorAction('bulk_delete')">
+                    <iconify-icon icon="solar:trash-bin-2-bold" width="15"></iconify-icon> Hapus Terpilih
+                </button>
+                <button type="button" class="gc-btn gc-btn-primary gc-btn-sm" onclick="GC.resolveAllErrors()">
+                    <iconify-icon icon="solar:verified-check-bold" width="15"></iconify-icon> Tandai Semua Selesai
+                </button>
+            </div>
         </div>
 
         <div class="ilm-data-container">
             <table class="lms-table ilmuna-table-stack">
                 <thead>
                     <tr>
+                        <th style="width:36px;"><input type="checkbox" id="errCheckAll" onchange="GC.toggleAllErrChecks(this.checked)"></th>
                         <th>Sumber &amp; Level</th>
                         <th>Pesan Error, File &amp; Nomor Baris</th>
                         <th>Frekuensi</th>
@@ -457,7 +485,7 @@ require_once BASE_PATH . '/includes/header.php';
                     </tr>
                 </thead>
                 <tbody id="errorLogsBody">
-                    <tr><td colspan="5" style="text-align:center;padding:24px;">Memuat error log...</td></tr>
+                    <tr><td colspan="6" style="text-align:center;padding:24px;">Memuat error log...</td></tr>
                 </tbody>
             </table>
         </div>
