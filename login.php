@@ -558,7 +558,7 @@ $loginActionUrl = GC_IS_LOCAL ? (BASE_URL . '/login.php') : (BASE_URL . '/login'
                             <img src="<?= gc_e(APP_LOGO_URL) ?>" alt="Guardian Dome" draggable="false">
                             <div class="logo-brand-txt">
                                 <strong>Guardian Control</strong>
-                                <small>Patch 11.0 · SEC-OPS</small>
+                                <small>Patch 12.0 · SEC-OPS</small>
                             </div>
                         </div>
                         <div class="mobile-side-text">

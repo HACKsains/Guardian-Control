@@ -29,7 +29,7 @@ require_once BASE_PATH . '/includes/header.php';
     <button type="button" class="curriculum-tab-btn <?= $activeTab === 'waf' ? 'is-active' : '' ?>" data-gc-tab="waf">
         <iconify-icon icon="solar:shield-star-bold" width="17"></iconify-icon>
         <span>WAF &amp; Policy</span>
-        <span class="curriculum-tab-counter" id="cntTabWaf">11.0</span>
+        <span class="curriculum-tab-counter" id="cntTabWaf">12.0</span>
     </button>
     <button type="button" class="curriculum-tab-btn <?= $activeTab === 'firewall' ? 'is-active' : '' ?>" data-gc-tab="firewall">
         <iconify-icon icon="solar:forbidden-circle-bold" width="17"></iconify-icon>
@@ -75,7 +75,7 @@ require_once BASE_PATH . '/includes/header.php';
         <div class="gc-kpi-card">
             <div>
                 <div class="gc-kpi-label">Engine WAF Aktif</div>
-                <div class="gc-kpi-val" id="wafPatchCode">New-Patch.11.0</div>
+                <div class="gc-kpi-val" id="wafPatchCode">New-Patch.12.0</div>
                 <div class="gc-kpi-sub" id="wafPolicyStatus">Memuat status bridge...</div>
             </div>
             <div class="gc-kpi-icon navy"><iconify-icon icon="solar:shield-check-bold"></iconify-icon></div>

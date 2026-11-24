@@ -55,7 +55,7 @@ require __DIR__ . '/menu.php';
             <span>Keluar Global (SLO)</span>
         </button>
         <div class="margo-left-status-line">
-            <span class="margo-left-status-dot">Patch 11.0</span>
+            <span class="margo-left-status-dot">Patch 12.0</span>
             <span><?= gc_e(APP_DOMAIN) ?></span>
         </div>
     </div>
