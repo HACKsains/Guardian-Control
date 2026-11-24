@@ -1,9 +1,14 @@
 <?php
 /**
  * ==============================================================================
- * GUARDIAN CONTROL — WEB AUTO-DEPLOYER & GITHUB WEBHOOK SYNC
+ * GUARDIAN CONTROL — WEB AUTO-DEPLOYER & GITHUB WEBHOOK SYNC (GIT + NATIVE PHP)
  * ==============================================================================
- * Cara 1 (Manual 1-Klik Browser / Cron):
+ * Mendukung 2 mesin update otomatis (100% cPanel-Safe):
+ *   1. Native Git (`git fetch` + `git reset --hard origin/main`) jika shell_exec aktif
+ *   2. Native PHP GitHub Zipball API (`cURL` + `ZipArchive`, tanpa shell_exec/SSH!)
+ *      bila `github_pat` diisi di config.local.php.
+ *
+ * Cara 1 (Manual 1-Klik Browser):
  *   https://guardian-dome.ilmuna.my.id/deploy.php?secret=guardian_control_deploy_2026
  *
  * Cara 2 (Otomatis tiap git push via GitHub Webhook):
@@ -16,11 +21,15 @@
 require_once __DIR__ . '/config.php';
 
 $deploySecret = (string)gc_cfg('deploy_secret', 'guardian_control_deploy_2026');
+$githubRepo   = (string)gc_cfg('github_repo', 'HACKsains/Guardian-Control');
+$githubBranch = (string)gc_cfg('github_branch', 'main');
+$githubToken  = (string)gc_cfg('github_pat', '');
+
 $rawPayload   = (string)file_get_contents('php://input');
 $ghSig256     = isset($_SERVER['HTTP_X_HUB_SIGNATURE_256']) ? trim((string)$_SERVER['HTTP_X_HUB_SIGNATURE_256']) : '';
 $querySecret  = isset($_GET['secret']) ? (string)$_GET['secret'] : '';
 
-$isWebhook = false;
+$isWebhook  = false;
 $authorized = false;
 
 if ($ghSig256 !== '') {
@@ -43,22 +52,119 @@ if (!$authorized) {
     exit;
 }
 
+/**
+ * Fallback 100% Native PHP: unduh zipball private repo via GitHub API & ekstrak aman
+ */
+function gc_deploy_via_github_zip($repo, $branch, $token, $targetDir)
+{
+    if (!function_exists('curl_init') || !class_exists('ZipArchive')) {
+        return "[ERROR] Ekstensi PHP cURL dan ZipArchive diperlukan untuk mode Native PHP Deploy.";
+    }
+    $url = "https://api.github.com/repos/{$repo}/zipball/{$branch}";
+    $tmpZip = GC_LOCAL_CACHE_DIR . '/deploy_' . time() . '.zip';
+    if (!is_dir(GC_LOCAL_CACHE_DIR)) {
+        @mkdir(GC_LOCAL_CACHE_DIR, 0755, true);
+    }
+
+    $fp = @fopen($tmpZip, 'wb');
+    if (!$fp) {
+        return "[ERROR] Tidak dapat membuat file sementara di {$tmpZip}.";
+    }
+
+    $headers = [
+        'User-Agent: GuardianControl-Deployer/1.0',
+        'Accept: application/vnd.github+json',
+    ];
+    if ($token !== '') {
+        $headers[] = 'Authorization: Bearer ' . $token;
+    }
+
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_FILE           => $fp,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_MAXREDIRS      => 5,
+        CURLOPT_TIMEOUT        => 60,
+        CURLOPT_HTTPHEADER     => $headers,
+        CURLOPT_SSL_VERIFYPEER => true,
+    ]);
+    $ok = curl_exec($ch);
+    $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $err = curl_error($ch);
+    curl_close($ch);
+    fclose($fp);
+
+    if (!$ok || $httpCode !== 200) {
+        @unlink($tmpZip);
+        return "[ERROR] Gagal mengunduh arsip GitHub (HTTP {$httpCode}): {$err}";
+    }
+
+    $zip = new ZipArchive();
+    if ($zip->open($tmpZip) !== true) {
+        @unlink($tmpZip);
+        return "[ERROR] Arsip ZIP dari GitHub rusak/tidak bisa dibuka.";
+    }
+
+    $skipFiles = ['config.local.php'];
+    $updated = 0;
+
+    for ($i = 0; $i < $zip->numFiles; $i++) {
+        $entryName = $zip->getNameIndex($i);
+        $slashPos  = strpos($entryName, '/');
+        if ($slashPos === false) {
+            continue;
+        }
+        $relPath = substr($entryName, $slashPos + 1);
+        if ($relPath === '' || substr($relPath, -1) === '/') {
+            continue;
+        }
+        if (strpos($relPath, '..') !== false || strpos($relPath, '.git/') === 0 || in_array($relPath, $skipFiles, true)) {
+            continue;
+        }
+
+        $destPath = rtrim($targetDir, '/\\') . '/' . $relPath;
+        $destDir  = dirname($destPath);
+        if (!is_dir($destDir)) {
+            @mkdir($destDir, 0755, true);
+        }
+        $stream = $zip->getStream($entryName);
+        if ($stream) {
+            $contents = stream_get_contents($stream);
+            fclose($stream);
+            if ($contents !== false && @file_put_contents($destPath, $contents, LOCK_EX) !== false) {
+                $updated++;
+            }
+        }
+    }
+
+    $zip->close();
+    @unlink($tmpZip);
+    return "[OK] Native PHP GitHub Deploy berhasil memperbarui {$updated} berkas dari {$repo}@{$branch} (config.local.php & cache/ tetap aman).";
+}
+
 $repoPath = __DIR__;
 $disabled = array_map('trim', explode(',', (string)ini_get('disable_functions')));
+$canShell = !in_array('shell_exec', $disabled, true) && function_exists('shell_exec');
 $logs     = [];
+$gitOk    = false;
 
-if (in_array('shell_exec', $disabled, true) || !function_exists('shell_exec')) {
-    $logs[] = "[WARN] shell_exec dinonaktifkan di konfigurasi PHP server.\nGunakan cPanel Git Version Control (Update from Remote -> Deploy HEAD Commit) atau cPanel Cron Job.";
-} else {
-    $commands = [
-        'Git Fetch'      => 'git fetch origin main 2>&1',
-        'Git Reset Main' => 'git reset --hard origin/main 2>&1',
-        'Git Status'     => 'git status -sb 2>&1',
-        'Last Commit'    => 'git log -1 --stat 2>&1',
-    ];
-    foreach ($commands as $label => $cmd) {
-        $out = @shell_exec('cd ' . escapeshellarg($repoPath) . ' && ' . $cmd);
-        $logs[] = "=== {$label} ===\n" . trim((string)$out);
+if ($canShell && is_dir($repoPath . '/.git')) {
+    $fetchOut = trim((string)@shell_exec('cd ' . escapeshellarg($repoPath) . ' && git fetch origin ' . escapeshellarg($githubBranch) . ' 2>&1'));
+    $logs[] = "=== Git Fetch ===\n" . ($fetchOut !== '' ? $fetchOut : '(up to date)');
+    if (stripos($fetchOut, 'fatal:') === false && stripos($fetchOut, 'error:') === false) {
+        $resetOut = trim((string)@shell_exec('cd ' . escapeshellarg($repoPath) . ' && git reset --hard origin/' . escapeshellarg($githubBranch) . ' 2>&1'));
+        $statOut  = trim((string)@shell_exec('cd ' . escapeshellarg($repoPath) . ' && git log -1 --stat 2>&1'));
+        $logs[] = "=== Git Reset Hard ===\n" . $resetOut;
+        $logs[] = "=== Last Commit ===\n" . $statOut;
+        $gitOk = true;
+    }
+}
+
+if (!$gitOk) {
+    if ($githubToken !== '') {
+        $logs[] = "=== Native PHP GitHub Zipball Fallback ===\n" . gc_deploy_via_github_zip($githubRepo, $githubBranch, $githubToken, $repoPath);
+    } else {
+        $logs[] = "[INFO] Untuk mengaktifkan Native PHP Auto-Update tanpa SSH/Git, tambahkan 'github_pat' => 'github_pat_...' di config.local.php.";
     }
 }
 
@@ -68,7 +174,7 @@ try {
     $pdo = getDBConnection();
     $tables = $pdo->query("SHOW TABLES LIKE 'gc_%'")->fetchAll(PDO::FETCH_COLUMN);
     $logs[] = "=== Verifikasi Database (" . GC_DB_NAME . ") ===\nOK — " . count($tables) . "/9 tabel aktif: " . implode(', ', $tables);
-    gc_audit_log('system_git_deploy', $isWebhook ? 'github_webhook' : 'manual_web', ['tables' => count($tables)], 'deployer');
+    gc_audit_log('system_git_deploy', $isWebhook ? 'github_webhook' : 'manual_web', ['git_ok' => $gitOk, 'tables' => count($tables)], 'deployer');
 } catch (Throwable $e) {
     $logs[] = "=== Verifikasi Database ===\n[ERROR] " . $e->getMessage();
 }
