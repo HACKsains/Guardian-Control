@@ -999,30 +999,30 @@ require_once BASE_PATH . '/includes/header.php';
     </div>
 </div>
 
-<!-- MODAL LIVE PREVIEW 1-TEMA HALAMAN MAINTENANCE (DESKTOP / MOBILE) -->
+<!-- MODAL LIVE PREVIEW 1-TEMA HALAMAN MAINTENANCE (FULL-SCREEN / MOBILE) -->
 <div class="ilm-modal-backdrop" id="gcMaintPreviewModal">
-    <div class="ilm-modal-dialog" style="max-width:1080px;">
+    <div class="ilm-modal-dialog" style="width:96vw;max-width:1440px;">
         <div class="ilm-modal-header">
             <div class="ilm-modal-header__brand">
                 <div class="ilm-modal-header__icon"><iconify-icon icon="solar:eye-bold"></iconify-icon></div>
                 <div>
-                    <h3 class="ilm-modal-header__title" id="maintPreviewTitle">Live Preview 1-Tema Maintenance</h3>
-                    <p class="ilm-modal-header__subtitle" id="maintPreviewSub">Tampilan persis yang dilihat pengunjung non-admin (HTTP 503)</p>
+                    <h3 class="ilm-modal-header__title" id="maintPreviewTitle">Live Preview Full-Screen 1-Tema</h3>
+                    <p class="ilm-modal-header__subtitle" id="maintPreviewSub">Tampilan layar penuh yang dilihat pengunjung non-admin (HTTP 503)</p>
                 </div>
             </div>
             <div style="display:flex;align-items:center;gap:6px;">
-                <button type="button" class="gc-pill-btn is-active" data-prev-vp="desktop" onclick="GC.setMaintPreviewViewport('desktop')">Desktop</button>
+                <button type="button" class="gc-pill-btn is-active" data-prev-vp="desktop" onclick="GC.setMaintPreviewViewport('desktop')">Desktop Full</button>
                 <button type="button" class="gc-pill-btn" data-prev-vp="mobile" onclick="GC.setMaintPreviewViewport('mobile')">Mobile 375px</button>
                 <button type="button" class="ilm-modal-header__close" onclick="GC.closeModal('gcMaintPreviewModal')"><iconify-icon icon="solar:close-circle-bold"></iconify-icon></button>
             </div>
         </div>
-        <div class="ilm-modal-body" style="padding:14px;background:#E2E8F0;">
+        <div class="ilm-modal-body" style="padding:0;background:#0B192C;">
             <div class="gc-preview-stage" id="maintPreviewStage">
                 <iframe id="maintPreviewIframe" class="gc-preview-iframe" title="Preview Halaman Maintenance 1-Tema"></iframe>
             </div>
         </div>
         <div class="ilm-modal-footer">
-            <a id="maintPreviewNewTab" href="#" target="_blank" rel="noopener" class="ilm-modal-btn ilm-modal-btn--ghost" style="text-decoration:none;">Buka di Tab Penuh ↗</a>
+            <a id="maintPreviewNewTab" href="#" target="_blank" rel="noopener" class="ilm-modal-btn ilm-modal-btn--ghost" style="text-decoration:none;">Buka Layar Penuh di Tab Baru ↗</a>
             <button type="button" class="ilm-modal-btn ilm-modal-btn--primary" onclick="GC.closeModal('gcMaintPreviewModal')">Tutup Preview</button>
         </div>
     </div>
