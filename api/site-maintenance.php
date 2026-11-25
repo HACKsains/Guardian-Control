@@ -183,7 +183,6 @@ body{position:relative;display:flex;flex-direction:column;justify-content:space-
 
 /* 3. BOTTOM FULL-WIDTH BAR */
 .fs-footer{position:relative;z-index:10;width:100%;padding:14px clamp(18px,4.5vw,56px) 22px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:0.78rem;color:rgba(226,232,240,0.82);border-top:1px solid rgba(255,255,255,0.12);background:rgba(11,25,44,0.28);backdrop-filter:blur(10px)}
-.adm-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 13px;border-radius:999px;border:1px solid rgba(255,255,255,0.24);background:rgba(255,255,255,0.10);color:#FFFFFF;font-family:"Outfit",sans-serif;font-size:0.75rem;font-weight:700}
 
 @media(max-width:960px){
   .fs-main{grid-template-columns:1fr;gap:26px;padding-top:12px}
@@ -264,10 +263,7 @@ body{position:relative;display:flex;flex-direction:column;justify-content:space-
 
 <footer class="fs-footer">
   <span><iconify-icon icon="solar:shield-check-bold" width="15" style="color:#34D399;vertical-align:-2px"></iconify-icon> Dilindungi <strong>Guardian Dome</strong> · SEC-OPS ilmuna.my.id</span>
-  <span style="display:inline-flex;align-items:center;gap:12px;flex-wrap:wrap;">
-    <span>' . $e($email) . '</span>
-    <span class="adm-chip"><iconify-icon icon="solar:lock-keyhole-bold" width="13" style="color:#FBBF24"></iconify-icon> Akses Khusus Admin</span>
-  </span>
+  <span>' . $e($email) . '</span>
 </footer>
 
 <script>
