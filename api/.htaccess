@@ -11,5 +11,8 @@
 <IfModule php7_module>
     php_value auto_prepend_file none
 </IfModule>
+<IfModule php8_module>
+    php_value auto_prepend_file none
+</IfModule>
 
 Options -Indexes

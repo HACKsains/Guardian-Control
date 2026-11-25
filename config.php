@@ -8,6 +8,49 @@
  * ==============================================================================
  */
 
+// ==============================================================================
+// GUARDIAN DOME — LAYER PERLINDUNGAN TERDEPAN (WAF + TELEGRAM SENTINEL)
+// Halaman browser (/login, /dashboard) dilindungi penuh; endpoint stateless
+// (/api/, sso-callback, sso-logout-webhook, logout, deploy, CLI) terisolasi aman.
+// ==============================================================================
+$gcScriptNow = str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? $_SERVER['PHP_SELF'] ?? ''));
+$gcSkipWaf   = (php_sapi_name() === 'cli')
+    || (defined('GC_SKIP_GD_WAF') && GC_SKIP_GD_WAF)
+    || (strpos($gcScriptNow, '/api/') !== false)
+    || (bool)preg_match('#/(sso-callback|sso-logout-webhook|logout|deploy)\.php$#i', $gcScriptNow);
+
+if (!$gcSkipWaf) {
+    $gd_waf_candidates = [
+        '/home/uofruaju/guardian-dome/guardian-dome-waf.php',
+        'C:/laragon/Guardian Dome/guardian-dome-waf.php',
+        dirname(__DIR__) . '/guardian-dome/guardian-dome-waf.php',
+        dirname(__DIR__) . '/Guardian Dome/guardian-dome-waf.php',
+        __DIR__ . '/../guardian-dome/guardian-dome-waf.php',
+        __DIR__ . '/guardian-dome-waf.php',
+    ];
+    foreach ($gd_waf_candidates as $gd_waf) {
+        if ($gd_waf && file_exists($gd_waf)) {
+            require_once $gd_waf;
+            break;
+        }
+    }
+
+    $gd_tg_candidates = [
+        '/home/uofruaju/guardian-dome/guardian-dome-telegram/bootstrap.php',
+        'C:/laragon/Guardian Dome/guardian-dome-telegram/bootstrap.php',
+        dirname(__DIR__) . '/guardian-dome/guardian-dome-telegram/bootstrap.php',
+        dirname(__DIR__) . '/Guardian Dome/guardian-dome-telegram/bootstrap.php',
+        __DIR__ . '/../guardian-dome/guardian-dome-telegram/bootstrap.php',
+        __DIR__ . '/guardian-dome-telegram/bootstrap.php',
+    ];
+    foreach ($gd_tg_candidates as $gd_tg) {
+        if ($gd_tg && file_exists($gd_tg)) {
+            require_once $gd_tg;
+            break;
+        }
+    }
+}
+
 if (!defined('GC_BOOTSTRAPPED')) {
     define('GC_BOOTSTRAPPED', true);
 }
@@ -175,6 +218,14 @@ function gc_get_error_log_sources()
                 'icon'  => 'solar:book-2-bold',
                 'paths' => [
                     '/home/uofruaju/learn.ilmuna.my.id/error_log',
+                    '/home/uofruaju/logs/php.error.log',
+                ],
+            ],
+            'about' => [
+                'label' => 'Portofolio (about.ilmuna.my.id)',
+                'icon'  => 'solar:user-id-bold',
+                'paths' => [
+                    '/home/uofruaju/about.ilmuna.my.id/error_log',
                 ],
             ],
             'guardian_dome' => [
@@ -271,6 +322,11 @@ function gc_get_uptime_targets()
             'name' => 'learn.ilmuna.my.id (LMS & SIAKAD)',
             'host' => 'learn.ilmuna.my.id',
             'url'  => 'https://learn.ilmuna.my.id/',
+        ],
+        [
+            'name' => 'about.ilmuna.my.id (Portofolio)',
+            'host' => 'about.ilmuna.my.id',
+            'url'  => 'https://about.ilmuna.my.id/',
         ],
         [
             'name' => 'guardian-dome.ilmuna.my.id (SEC-OPS)',
