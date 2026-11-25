@@ -62,8 +62,9 @@ gc_json_response([
         'ai_blocked_24h'    => $aiBlocked24h,
         'unique_today'      => $uniqueToday,
         'online_5m'         => $online5m,
-        'unresolved_errors' => $unresolvedErrors,
-        'fim_alerts'        => $fimAlerts,
+        'unresolved_errors'  => $unresolvedErrors,
+        'fim_alerts'         => $fimAlerts,
+        'maintenance_active' => gc_waf_count_maintenance_active(),
     ],
     'health_quick' => [
         'ram_pct'  => $ram['used_pct'],

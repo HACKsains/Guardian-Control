@@ -33,6 +33,12 @@ $gcSidebarGroups = [
                 'icon'  => 'solar:danger-triangle-bold',
                 'badge_id' => 'sideBadgeIncidents',
             ],
+            [
+                'tab'   => 'maintenance',
+                'label' => 'Maintenance Website',
+                'icon'  => 'solar:tuning-square-2-bold',
+                'badge_id' => 'sideBadgeMaint',
+            ],
         ],
     ],
     [

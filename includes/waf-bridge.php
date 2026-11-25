@@ -54,10 +54,92 @@ function gc_atomic_write_json($filePath, array $data)
     return true;
 }
 
+function gc_waf_get_secret_salt()
+{
+    static $salt = null;
+    if ($salt !== null) {
+        return $salt;
+    }
+    $salt = 'GD_ILMUNA_SECOPS_SHIELD_2026_x8b2ec91a';
+    if (is_file(GC_WAF_FILE)) {
+        $head = @file_get_contents(GC_WAF_FILE, false, null, 0, 8192);
+        if (is_string($head) && preg_match("/const\s+SECRET_SALT\s*=\s*'([^']+)'/", $head, $m)) {
+            $salt = $m[1];
+        }
+    }
+    return $salt;
+}
+
+function gc_waf_default_maintenance()
+{
+    return [
+        'global_enabled'            => false,
+        'global_title'              => 'Pemeliharaan Ekosistem Digital Ilmuna',
+        'global_message'            => 'Seluruh layanan ekosistem Ilmuna sedang menjalani pemeliharaan terjadwal & peningkatan keamanan server. Kami akan segera kembali aktif.',
+        'global_eta'                => '',
+        'global_progress'           => 70,
+        'allow_admin_bypass'        => true,
+        'allow_ip_whitelist_bypass' => false,
+        'bypass_key'                => 'ilmuna2026',
+        'contact_email'             => 'admin@ilmuna.my.id',
+        'contact_whatsapp'          => '6285117100227',
+        'sites'              => [
+            'ilmuna.my.id' => [
+                'label'         => 'Portal Utama (WordPress)',
+                'icon'          => 'solar:global-bold',
+                'enabled'       => false,
+                'title'         => 'Portal Ilmuna Sedang Diperbarui',
+                'message'       => 'Kami sedang mengoptimalkan performa & keamanan portal utama ilmuna.my.id agar pengalaman belajar semakin nyaman.',
+                'eta'           => '',
+                'auto_end'      => true,
+                'progress'      => 65,
+                'retry_after'   => 1800,
+                'contact_email' => 'admin@ilmuna.my.id',
+            ],
+            'margo-one.ilmuna.my.id' => [
+                'label'         => 'Margo One SSO (Identity Provider)',
+                'icon'          => 'solar:shield-keyhole-bold',
+                'enabled'       => false,
+                'title'         => 'Pemeliharaan Margo One SSO',
+                'message'       => 'Sistem autentikasi terpadu Margo One SSO sedang menjalani pembaruan keamanan enkripsi RS256. Sesi aktif Anda tetap aman.',
+                'eta'           => '',
+                'auto_end'      => true,
+                'progress'      => 75,
+                'retry_after'   => 900,
+                'contact_email' => 'admin@ilmuna.my.id',
+            ],
+            'learn.ilmuna.my.id' => [
+                'label'         => 'Ilmuna Learn (LMS & SIAKAD)',
+                'icon'          => 'solar:square-academic-cap-2-bold',
+                'enabled'       => false,
+                'title'         => 'Ilmuna Learn Sedang Pemeliharaan',
+                'message'       => 'Platform pembelajaran & SIAKAD sedang kami tingkatkan agar materi, tugas, dan ujian berjalan lebih cepat dan stabil.',
+                'eta'           => '',
+                'auto_end'      => true,
+                'progress'      => 60,
+                'retry_after'   => 1800,
+                'contact_email' => 'admin@ilmuna.my.id',
+            ],
+            'about.ilmuna.my.id' => [
+                'label'         => 'Portofolio & Profil (about.ilmuna.my.id)',
+                'icon'          => 'solar:user-id-bold',
+                'enabled'       => false,
+                'title'         => 'Halaman Sedang Pembaruan Tampilan',
+                'message'       => 'Kami sedang memperbarui konten dan tampilan halaman portofolio about.ilmuna.my.id. Silakan kembali beberapa saat lagi.',
+                'eta'           => '',
+                'auto_end'      => true,
+                'progress'      => 80,
+                'retry_after'   => 1800,
+                'contact_email' => 'admin@ilmuna.my.id',
+            ],
+        ],
+    ];
+}
+
 function gc_waf_default_policy()
 {
     return [
-        'schema_version'          => 1,
+        'schema_version'          => 2,
         'under_attack_mode'       => false,
         'enable_preflight_scan'   => true,
         'enable_shield_v3'        => true,
@@ -70,9 +152,84 @@ function gc_waf_default_policy()
         'rate_limit_flood_ban'    => 65,
         'whitelist_ips'           => ['127.0.0.1', '::1', '103.105.78.163'],
         'blacklist_ips'           => [],
+        'maintenance'             => gc_waf_default_maintenance(),
         'updated_at'              => date('Y-m-d H:i:s'),
         'updated_by'              => 'system',
     ];
+}
+
+function gc_waf_read_maintenance()
+{
+    $policy   = gc_waf_read_policy();
+    $defaults = gc_waf_default_maintenance();
+    $stored   = isset($policy['maintenance']) && is_array($policy['maintenance']) ? $policy['maintenance'] : [];
+
+    $merged = array_merge($defaults, $stored);
+    $sites  = $defaults['sites'];
+    if (isset($stored['sites']) && is_array($stored['sites'])) {
+        foreach ($stored['sites'] as $host => $cfg) {
+            if (!is_array($cfg)) {
+                continue;
+            }
+            $h = strtolower(trim((string)$host));
+            if ($h === '' || $h === 'guardian-dome.ilmuna.my.id') {
+                continue;
+            }
+            $base = isset($sites[$h]) ? $sites[$h] : [
+                'label'         => $h,
+                'icon'          => 'solar:global-bold',
+                'enabled'       => false,
+                'title'         => 'Sedang Pemeliharaan Sistem',
+                'message'       => 'Website ini sedang menjalani pemeliharaan terjadwal untuk peningkatan layanan.',
+                'eta'           => '',
+                'auto_end'      => true,
+                'progress'      => 60,
+                'retry_after'   => 1800,
+                'contact_email' => 'admin@ilmuna.my.id',
+            ];
+            $sites[$h] = array_merge($base, $cfg);
+        }
+    }
+    $merged['sites'] = $sites;
+    return $merged;
+}
+
+function gc_waf_write_maintenance(array $maint, $updatedBy = null)
+{
+    // Pastikan panel guardian-dome.ilmuna.my.id tidak pernah mengunci dirinya sendiri
+    if (isset($maint['sites']['guardian-dome.ilmuna.my.id'])) {
+        unset($maint['sites']['guardian-dome.ilmuna.my.id']);
+    }
+    $maint['global_enabled']            = !empty($maint['global_enabled']);
+    $maint['allow_admin_bypass']        = !empty($maint['allow_admin_bypass']);
+    $maint['allow_ip_whitelist_bypass'] = !empty($maint['allow_ip_whitelist_bypass']);
+    $maint['global_progress']           = max(0, min(100, (int)($maint['global_progress'] ?? 70)));
+    $maint['bypass_key']                = preg_replace('/[^a-zA-Z0-9_-]/', '', (string)($maint['bypass_key'] ?? 'ilmuna2026')) ?: 'ilmuna2026';
+
+    return gc_waf_write_policy(['maintenance' => $maint], $updatedBy);
+}
+
+function gc_waf_count_maintenance_active()
+{
+    $m = gc_waf_read_maintenance();
+    if (!empty($m['global_enabled'])) {
+        return count($m['sites']);
+    }
+    $cnt = 0;
+    $now = time();
+    foreach ($m['sites'] as $s) {
+        if (empty($s['enabled'])) {
+            continue;
+        }
+        if (!empty($s['auto_end']) && !empty($s['eta'])) {
+            $etaTs = strtotime((string)$s['eta']);
+            if ($etaTs !== false && $etaTs <= $now) {
+                continue;
+            }
+        }
+        $cnt++;
+    }
+    return $cnt;
 }
 
 function gc_waf_policy_file()

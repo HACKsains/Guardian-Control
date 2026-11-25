@@ -21,7 +21,8 @@
         visRange: '7d',
         myIp: '',
         incidentsCache: [],
-        errorsCache: []
+        errorsCache: [],
+        maintData: null
     };
 
     function esc(str) {
@@ -101,11 +102,14 @@
             var c = d.counters || {};
             setText('cntTabBans', c.active_bans || 0);
             setText('cntTabIncidents', c.incidents_24h || 0);
+            setText('cntTabMaint', c.maintenance_active || 0);
             setText('cntTabErrors', c.unresolved_errors || 0);
             setText('cntTabVisitors', c.unique_today || 0);
             setText('cntTabFim', c.fim_alerts || 0);
             setText('cntTabServer', (d.health_quick ? d.health_quick.ram_pct + '%' : '--'));
 
+            var maintEl = document.getElementById('cntTabMaint');
+            if (maintEl) maintEl.classList.toggle('is-danger', (c.maintenance_active || 0) > 0);
             var fimEl = document.getElementById('cntTabFim');
             if (fimEl) fimEl.classList.toggle('is-danger', (c.fim_alerts || 0) > 0);
             var errEl = document.getElementById('cntTabErrors');
@@ -113,6 +117,7 @@
 
             updateSideBadge('sideBadgeBans', c.active_bans);
             updateSideBadge('sideBadgeIncidents', c.incidents_24h);
+            updateSideBadge('sideBadgeMaint', c.maintenance_active);
             updateSideBadge('sideBadgeErrors', c.unresolved_errors);
             updateSideBadge('sideBadgeVisitors', c.unique_today);
             updateSideBadge('sideBadgeFim', c.fim_alerts);
@@ -171,6 +176,7 @@
             if (tab === 'waf') loadWafPolicy();
             else if (tab === 'firewall') loadFirewall();
             else if (tab === 'incidents') loadIncidents();
+            else if (tab === 'maintenance') loadSiteMaintenance();
             else if (tab === 'server') loadServerTelemetry();
             else if (tab === 'errors') loadErrorLogs();
             else if (tab === 'visitors') loadVisitorsAndBots();
@@ -494,6 +500,375 @@
             '<button type="button" class="ilm-modal-btn ilm-modal-btn--primary" onclick="GC.closeModal(\'gcDetailModal\');GC.openWhitelistModal(\'' + esc(inc.ip_address) + '\')">Whitelist IP</button>' +
             '<button type="button" class="ilm-modal-btn ilm-modal-btn--danger" onclick="GC.closeModal(\'gcDetailModal\');GC.openBanModal(\'' + esc(inc.ip_address) + '\')">Ban IP</button>';
         openModal('gcDetailModal');
+    }
+
+    // ==========================================================================
+    // TAB 3.5: PER-WEBSITE & GLOBAL MAINTENANCE CONTROL (ADMIN-ONLY BYPASS)
+    // ==========================================================================
+    var CORE_MAINT_SITES = ['ilmuna.my.id', 'margo-one.ilmuna.my.id', 'learn.ilmuna.my.id', 'about.ilmuna.my.id'];
+
+    function toDatetimeLocalVal(etaStr) {
+        if (!etaStr) return '';
+        var s = String(etaStr).trim().replace(' ', 'T');
+        return s.length >= 16 ? s.slice(0, 16) : s;
+    }
+
+    function renderSiteMaintenance(m, meta) {
+        state.maintData = m || {};
+        var isGlobal = !!m.global_enabled;
+        var swGlob = document.getElementById('sw_maint_global_enabled');
+        if (swGlob) swGlob.checked = isGlobal;
+        var gBox = document.getElementById('maintGlobalBox');
+        if (gBox) gBox.classList.toggle('is-global-on', isGlobal);
+
+        var swAdm = document.getElementById('sw_maint_allow_admin');
+        if (swAdm) swAdm.checked = m.allow_admin_bypass !== false;
+
+        var bKey = m.bypass_key || 'ilmuna2026';
+        setText('maintBypassKeyBadge', '?gd_maint_bypass=' + bKey);
+
+        if (meta && meta.admin_username) {
+            var passEl = document.getElementById('maintAdminPassText');
+            if (passEl) {
+                passEl.innerHTML = 'Sesi Admin <strong>' + esc(meta.admin_username) + '</strong> aktif lintas <code>.ilmuna.my.id</code> — Anda dapat mengakses website secara penuh saat Maintenance, sementara selain Admin otomatis masuk Halaman 503.';
+            }
+        }
+
+        var grid = document.getElementById('maintSitesGrid');
+        if (!grid) return;
+        var sites = m.sites || {};
+        var hosts = Object.keys(sites);
+        if (!hosts.length) {
+            grid.innerHTML = '<div class="gc-card" style="text-align:center;padding:28px;color:var(--gc-muted);">Belum ada domain terdaftar.</div>';
+            return;
+        }
+
+        grid.innerHTML = hosts.map(function (host) {
+            var s = sites[host] || {};
+            var siteOn = !!s.enabled;
+            var etaExpired = false;
+            if (siteOn && s.auto_end && s.eta) {
+                var parsed = Date.parse(String(s.eta).replace(' ', 'T'));
+                if (!isNaN(parsed) && parsed <= Date.now()) etaExpired = true;
+            }
+            var effectiveOn = isGlobal || (siteOn && !etaExpired);
+            var prog = Math.max(5, Math.min(100, parseInt(s.progress != null ? s.progress : 65, 10) || 65));
+            var isCore = CORE_MAINT_SITES.indexOf(host) !== -1;
+            var statusHtml = effectiveOn
+                ? '<span class="gc-maint-pill is-maint"><span class="pdot"></span>' + (isGlobal && !siteOn ? 'MAINTENANCE (GLOBAL 503)' : 'MAINTENANCE 503 AKTIF') + '</span>'
+                : '<span class="gc-maint-pill is-online"><span class="pdot"></span>ONLINE · NORMAL</span>';
+            var etaLabel = s.eta ? ('ETA: ' + esc(String(s.eta).replace('T', ' ')) + (s.auto_end ? ' (Auto-Buka)' : '')) : 'ETA: Manual';
+            var accessHint = effectiveOn
+                ? '<span class="gc-badge gc-badge-ok" title="Anda login sebagai Admin Guardian Control">Admin: Akses Penuh · Publik: 503</span>'
+                : '<span class="gc-badge gc-badge-info">Terbuka untuk Publik</span>';
+
+            return '<div class="gc-maint-card' + (effectiveOn ? ' is-active-maint' : '') + '" data-maint-host="' + esc(host) + '">' +
+                '<div class="gc-maint-card-top">' +
+                    '<div class="gc-maint-site-id">' +
+                        '<div class="gc-maint-site-ico"><iconify-icon icon="' + esc(s.icon || 'solar:global-bold') + '"></iconify-icon></div>' +
+                        '<div style="min-width:0;">' +
+                            '<div class="gc-maint-site-name">' + esc(s.label || host) + '</div>' +
+                            '<div class="gc-maint-site-host"><iconify-icon icon="solar:link-minimalistic-2-bold" width="13"></iconify-icon><span>https://' + esc(host) + '</span></div>' +
+                        '</div>' +
+                    '</div>' +
+                    '<label class="gc-toggle ' + (effectiveOn ? 'is-danger' : '') + '" title="Aktifkan/Matikan Maintenance ' + esc(host) + '">' +
+                        '<input type="checkbox" ' + (siteOn ? 'checked' : '') + ' onchange="GC.toggleSiteMaintenance(\'' + esc(host) + '\', this.checked, this)">' +
+                        '<span class="gc-toggle-slider"></span>' +
+                    '</label>' +
+                '</div>' +
+
+                '<div class="gc-maint-status-row">' + statusHtml + accessHint + '</div>' +
+
+                '<div class="gc-maint-msg-box">' +
+                    '<div class="gc-maint-msg-title">' + esc(s.title || 'Sedang Pemeliharaan Sistem') + '</div>' +
+                    '<div class="gc-maint-msg-text">' + esc(s.message || '') + '</div>' +
+                    '<div class="gc-meter-bar" style="height:8px;margin-top:9px;"><div class="gc-meter-fill ' + (effectiveOn ? 'warn' : '') + '" style="width:' + prog + '%"></div></div>' +
+                    '<div class="gc-maint-meta-row"><span>Progres: <strong>' + prog + '%</strong></span><span>' + etaLabel + '</span></div>' +
+                '</div>' +
+
+                '<div class="gc-maint-actions">' +
+                    '<button type="button" class="gc-btn gc-btn-primary gc-btn-sm" onclick="GC.openMaintEditModal(\'' + esc(host) + '\')">' +
+                        '<iconify-icon icon="solar:pen-new-square-bold" width="15"></iconify-icon> Edit &amp; ETA' +
+                    '</button>' +
+                    '<button type="button" class="gc-btn gc-btn-ghost gc-btn-sm" onclick="GC.openMaintPreview(\'' + esc(host) + '\')">' +
+                        '<iconify-icon icon="solar:eye-bold" width="15"></iconify-icon> Preview 1-Tema' +
+                    '</button>' +
+                    '<a href="https://' + esc(host) + '/" target="_blank" rel="noopener" class="gc-btn gc-btn-teal gc-btn-sm" title="Buka website dengan sesi Admin Anda">' +
+                        '<iconify-icon icon="solar:square-top-down-bold" width="15"></iconify-icon> Buka (Admin)' +
+                    '</a>' +
+                    '<button type="button" class="gc-btn gc-btn-ghost gc-btn-sm" onclick="GC.copyBypassLink(\'' + esc(host) + '\')" title="Salin tautan akses Admin untuk perangkat lain">' +
+                        '<iconify-icon icon="solar:key-bold" width="15"></iconify-icon>' +
+                    '</button>' +
+                    (!isCore ? '<button type="button" class="gc-btn gc-btn-danger gc-btn-sm" onclick="GC.removeMaintSite(\'' + esc(host) + '\')" title="Hapus subdomain kustom"><iconify-icon icon="solar:trash-bin-trash-bold" width="15"></iconify-icon></button>' : '') +
+                '</div>' +
+            '</div>';
+        }).join('');
+    }
+
+    async function loadSiteMaintenance() {
+        try {
+            var d = await apiFetch('site-maintenance.php');
+            if (!d) return;
+            renderSiteMaintenance(d.maintenance || {}, d);
+            setText('cntTabMaint', d.active_count || 0);
+            updateSideBadge('sideBadgeMaint', d.active_count || 0);
+            var maintEl = document.getElementById('cntTabMaint');
+            if (maintEl) maintEl.classList.toggle('is-danger', (d.active_count || 0) > 0);
+        } catch (err) {
+            toast('error', 'Gagal Memuat Kontrol Maintenance', err.message);
+        }
+    }
+
+    async function toggleSiteMaintenance(host, enabled, inputEl) {
+        try {
+            var d = await apiFetch('site-maintenance.php', {
+                method: 'POST',
+                body: { action: 'toggle_site', host: host, enabled: !!enabled }
+            });
+            if (d) {
+                renderSiteMaintenance(d.maintenance || {});
+                var card = document.querySelector('.gc-maint-card[data-maint-host="' + CSS.escape(host) + '"]');
+                if (card) card.classList.add('row-flash');
+                toast(enabled ? 'warning' : 'success', enabled ? 'Mode Maintenance Aktif' : 'Website Kembali Online', d.message);
+                loadOverview();
+            }
+        } catch (err) {
+            if (inputEl) inputEl.checked = !enabled;
+            toast('error', 'Gagal Mengubah Status Maintenance', err.message);
+        }
+    }
+
+    function toggleGlobalMaintenance(enabled) {
+        var sw = document.getElementById('sw_maint_global_enabled');
+        askConfirm({
+            title: enabled ? 'Aktifkan Global Maintenance Seluruh Ekosistem?' : 'Matikan Global Maintenance?',
+            message: enabled
+                ? 'Seluruh website *.ilmuna.my.id akan menampilkan Halaman Maintenance 503 kepada publik. Anda sebagai Admin tetap bisa mengakses semua website dan panel Guardian Control.'
+                : 'Global Maintenance akan dinonaktifkan (website yang saklar individualnya ON tetap mengikuti saklar masing-masing).',
+            confirmText: enabled ? 'Ya, Aktifkan Global 503' : 'Ya, Matikan Global',
+            type: enabled ? 'danger' : 'warning'
+        }, async function () {
+            try {
+                var d = await apiFetch('site-maintenance.php', {
+                    method: 'POST',
+                    body: { action: 'toggle_global', enabled: !!enabled }
+                });
+                if (d) {
+                    renderSiteMaintenance(d.maintenance || {});
+                    toast(enabled ? 'warning' : 'success', enabled ? 'Global Maintenance Aktif' : 'Global Maintenance Mati', d.message);
+                    loadOverview();
+                }
+            } catch (err) {
+                if (sw) sw.checked = !enabled;
+                toast('error', 'Gagal Mengubah Global Maintenance', err.message);
+            }
+        });
+        // Kembalikan visual sementara hingga admin klik Konfirmasi
+        if (sw) sw.checked = !enabled;
+    }
+
+    async function quickSaveMaintAccess() {
+        var m = state.maintData || {};
+        var allowAdm = !!document.getElementById('sw_maint_allow_admin').checked;
+        try {
+            var d = await apiFetch('site-maintenance.php', {
+                method: 'POST',
+                body: {
+                    action: 'save_global_opts',
+                    allow_admin_bypass: allowAdm,
+                    allow_ip_whitelist_bypass: !!m.allow_ip_whitelist_bypass,
+                    bypass_key: m.bypass_key || 'ilmuna2026',
+                    global_title: m.global_title || '',
+                    global_message: m.global_message || '',
+                    global_eta: m.global_eta || '',
+                    global_progress: m.global_progress != null ? m.global_progress : 70,
+                    contact_whatsapp: m.contact_whatsapp || '6285117100227'
+                }
+            });
+            if (d) {
+                renderSiteMaintenance(d.maintenance || {});
+                toast('success', 'Akses Admin Diperbarui', allowAdm ? 'Admin dapat mengakses web saat maintenance.' : 'Bypass Admin dimatikan sementara.');
+            }
+        } catch (err) {
+            toast('error', 'Gagal Menyimpan', err.message);
+        }
+    }
+
+    function openMaintEditModal(host) {
+        var sites = (state.maintData && state.maintData.sites) ? state.maintData.sites : {};
+        var s = sites[host] || {};
+        setText('maintSiteModalTitle', 'Atur Maintenance · ' + host);
+        setText('maintSiteModalSub', 'Perubahan langsung aktif di Guardian Dome WAF (0ms DB load)');
+        var hostEl = document.getElementById('msHost');
+        hostEl.value = host;
+        hostEl.readOnly = true;
+        document.getElementById('msLabel').value = s.label || host;
+        document.getElementById('msTitle').value = s.title || 'Sedang Pemeliharaan Sistem';
+        document.getElementById('msMessage').value = s.message || '';
+        document.getElementById('msEta').value = toDatetimeLocalVal(s.eta || '');
+        var prog = s.progress != null ? s.progress : 65;
+        document.getElementById('msProgress').value = prog;
+        setText('msProgVal', prog);
+        document.getElementById('msRetryAfter').value = s.retry_after || 1800;
+        document.getElementById('msEmail').value = s.contact_email || 'admin@ilmuna.my.id';
+        document.getElementById('msAutoEnd').checked = s.auto_end !== false;
+        openModal('gcMaintSiteModal');
+    }
+
+    function openAddMaintSiteModal() {
+        setText('maintSiteModalTitle', 'Tambah Subdomain Ekosistem');
+        setText('maintSiteModalSub', 'Daftarkan subdomain *.ilmuna.my.id ke kontrol maintenance');
+        var hostEl = document.getElementById('msHost');
+        hostEl.value = '';
+        hostEl.readOnly = false;
+        document.getElementById('msLabel').value = '';
+        document.getElementById('msTitle').value = 'Sedang Pemeliharaan Sistem';
+        document.getElementById('msMessage').value = 'Website ini sedang menjalani pemeliharaan terjadwal untuk peningkatan layanan.';
+        document.getElementById('msEta').value = '';
+        document.getElementById('msProgress').value = 60;
+        setText('msProgVal', 60);
+        document.getElementById('msRetryAfter').value = 1800;
+        document.getElementById('msEmail').value = 'admin@ilmuna.my.id';
+        document.getElementById('msAutoEnd').checked = true;
+        openModal('gcMaintSiteModal');
+    }
+
+    async function submitMaintSiteConfig() {
+        var host = document.getElementById('msHost').value.trim().toLowerCase();
+        if (!host) {
+            toast('warning', 'Domain Wajib Diisi', 'Masukkan domain seperti ppdb.ilmuna.my.id');
+            return;
+        }
+        try {
+            var d = await apiFetch('site-maintenance.php', {
+                method: 'POST',
+                body: {
+                    action: 'save_site_config',
+                    host: host,
+                    label: document.getElementById('msLabel').value.trim() || host,
+                    title: document.getElementById('msTitle').value.trim(),
+                    message: document.getElementById('msMessage').value.trim(),
+                    eta: document.getElementById('msEta').value.trim(),
+                    progress: parseInt(document.getElementById('msProgress').value || '65', 10),
+                    retry_after: parseInt(document.getElementById('msRetryAfter').value || '1800', 10),
+                    contact_email: document.getElementById('msEmail').value.trim(),
+                    auto_end: !!document.getElementById('msAutoEnd').checked
+                }
+            });
+            if (d) {
+                closeModal('gcMaintSiteModal');
+                renderSiteMaintenance(d.maintenance || {});
+                var card = document.querySelector('.gc-maint-card[data-maint-host="' + CSS.escape(host) + '"]');
+                if (card) card.classList.add('row-flash');
+                toast('success', 'Konfigurasi Disimpan', d.message);
+                loadOverview();
+            }
+        } catch (err) {
+            toast('error', 'Gagal Menyimpan Konfigurasi', err.message);
+        }
+    }
+
+    function openMaintGlobalModal() {
+        var m = state.maintData || {};
+        document.getElementById('mgTitle').value = m.global_title || 'Pemeliharaan Ekosistem Digital Ilmuna';
+        document.getElementById('mgMessage').value = m.global_message || '';
+        document.getElementById('mgEta').value = toDatetimeLocalVal(m.global_eta || '');
+        var prog = m.global_progress != null ? m.global_progress : 70;
+        document.getElementById('mgProgress').value = prog;
+        setText('mgProgVal', prog);
+        document.getElementById('mgBypassKey').value = m.bypass_key || 'ilmuna2026';
+        document.getElementById('mgWhatsapp').value = m.contact_whatsapp || '6285117100227';
+        document.getElementById('mgAllowAdmin').checked = m.allow_admin_bypass !== false;
+        document.getElementById('mgAllowIpWl').checked = !!m.allow_ip_whitelist_bypass;
+        openModal('gcMaintGlobalModal');
+    }
+
+    async function submitMaintGlobalOpts() {
+        try {
+            var d = await apiFetch('site-maintenance.php', {
+                method: 'POST',
+                body: {
+                    action: 'save_global_opts',
+                    global_title: document.getElementById('mgTitle').value.trim(),
+                    global_message: document.getElementById('mgMessage').value.trim(),
+                    global_eta: document.getElementById('mgEta').value.trim(),
+                    global_progress: parseInt(document.getElementById('mgProgress').value || '70', 10),
+                    bypass_key: document.getElementById('mgBypassKey').value.trim(),
+                    contact_whatsapp: document.getElementById('mgWhatsapp').value.trim(),
+                    allow_admin_bypass: !!document.getElementById('mgAllowAdmin').checked,
+                    allow_ip_whitelist_bypass: !!document.getElementById('mgAllowIpWl').checked
+                }
+            });
+            if (d) {
+                closeModal('gcMaintGlobalModal');
+                renderSiteMaintenance(d.maintenance || {});
+                toast('success', 'Pengaturan Global Disimpan', d.message);
+            }
+        } catch (err) {
+            toast('error', 'Gagal Menyimpan Pengaturan', err.message);
+        }
+    }
+
+    function removeMaintSite(host) {
+        askConfirm({
+            title: 'Hapus ' + host + ' dari Daftar Maintenance?',
+            message: 'Subdomain kustom ini akan dihapus dari panel maintenance (website kembali online normal).',
+            confirmText: 'Ya, Hapus',
+            type: 'danger'
+        }, async function () {
+            try {
+                var d = await apiFetch('site-maintenance.php', { method: 'POST', body: { action: 'remove_site', host: host } });
+                if (d) {
+                    renderSiteMaintenance(d.maintenance || {});
+                    toast('success', 'Subdomain Dihapus', d.message);
+                    loadOverview();
+                }
+            } catch (err) {
+                toast('error', 'Gagal Menghapus', err.message);
+            }
+        });
+    }
+
+    function openMaintPreview(host) {
+        var url = BASE + '/api/site-maintenance.php?preview=1&host=' + encodeURIComponent(host) + '&_t=' + Date.now();
+        setText('maintPreviewTitle', 'Live Preview 1-Tema · ' + (host === '__global__' ? 'Global (*.ilmuna.my.id)' : host));
+        var iframe = document.getElementById('maintPreviewIframe');
+        if (iframe) iframe.src = url;
+        var aNew = document.getElementById('maintPreviewNewTab');
+        if (aNew) aNew.href = url;
+        setMaintPreviewViewport('desktop');
+        openModal('gcMaintPreviewModal');
+    }
+
+    function setMaintPreviewViewport(mode) {
+        var stage = document.getElementById('maintPreviewStage');
+        if (stage) stage.classList.toggle('is-mobile', mode === 'mobile');
+        document.querySelectorAll('[data-prev-vp]').forEach(function (b) {
+            b.classList.toggle('is-active', b.getAttribute('data-prev-vp') === mode);
+        });
+    }
+
+    function copyTextFallback(text, okTitle, okMsg) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(function () {
+                toast('success', okTitle, okMsg);
+            }).catch(function () {
+                toast('info', okTitle, text);
+            });
+        } else {
+            toast('info', okTitle, text);
+        }
+    }
+
+    function copyBypassLink(host) {
+        var key = (state.maintData && state.maintData.bypass_key) ? state.maintData.bypass_key : 'ilmuna2026';
+        var url = 'https://' + host + '/?gd_maint_bypass=' + encodeURIComponent(key);
+        copyTextFallback(url, 'Tautan Akses Admin Disalin', 'Buka tautan ini di HP/browser lain agar bisa mengakses ' + host + ' saat maintenance.');
+    }
+
+    function copyBypassParam() {
+        var key = (state.maintData && state.maintData.bypass_key) ? state.maintData.bypass_key : 'ilmuna2026';
+        copyTextFallback('?gd_maint_bypass=' + key, 'Parameter Bypass Disalin', 'Tambahkan ?gd_maint_bypass=' + key + ' di ujung URL web mana pun saat maintenance.');
     }
 
     // ==========================================================================
@@ -1340,6 +1715,20 @@
         removeWhitelist: removeWhitelist,
         loadIncidents: loadIncidents,
         showIncidentDetail: showIncidentDetail,
+        loadSiteMaintenance: loadSiteMaintenance,
+        toggleSiteMaintenance: toggleSiteMaintenance,
+        toggleGlobalMaintenance: toggleGlobalMaintenance,
+        quickSaveMaintAccess: quickSaveMaintAccess,
+        openMaintEditModal: openMaintEditModal,
+        openAddMaintSiteModal: openAddMaintSiteModal,
+        submitMaintSiteConfig: submitMaintSiteConfig,
+        openMaintGlobalModal: openMaintGlobalModal,
+        submitMaintGlobalOpts: submitMaintGlobalOpts,
+        removeMaintSite: removeMaintSite,
+        openMaintPreview: openMaintPreview,
+        setMaintPreviewViewport: setMaintPreviewViewport,
+        copyBypassLink: copyBypassLink,
+        copyBypassParam: copyBypassParam,
         runUptimeCheckNow: runUptimeCheckNow,
         recordServerSnapshot: recordServerSnapshot,
         loadErrorLogs: loadErrorLogs,

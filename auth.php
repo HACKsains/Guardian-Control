@@ -154,7 +154,109 @@ function getCurrentUser()
         return null;
     }
     $_SESSION['gc_admin']['last_active_at'] = time();
+    gc_ensure_admin_maint_cookie((string)($admin['username'] ?? 'admin'));
     return $_SESSION['gc_admin'];
+}
+
+/**
+ * Terbitkan cookie kriptografis lintas subdomain (.ilmuna.my.id) agar Admin yang
+ * login di Guardian Control OTOMATIS dapat mengakses website yang sedang Maintenance,
+ * sementara seluruh pengunjung selain admin melihat halaman Maintenance 503.
+ */
+function gc_get_maint_cookie_domain()
+{
+    $host = isset($_SERVER['HTTP_HOST']) ? strtolower(trim(explode(':', (string)$_SERVER['HTTP_HOST'])[0])) : '';
+    if ($host !== '' && substr($host, -12) === 'ilmuna.my.id') {
+        return '.ilmuna.my.id';
+    }
+    return '';
+}
+
+function gc_get_maint_hmac_salt()
+{
+    if (function_exists('gc_waf_get_secret_salt')) {
+        return gc_waf_get_secret_salt();
+    }
+    $salt = 'GD_ILMUNA_SECOPS_SHIELD_2026_x8b2ec91a';
+    if (defined('GC_WAF_FILE') && is_file(GC_WAF_FILE)) {
+        $head = @file_get_contents(GC_WAF_FILE, false, null, 0, 8192);
+        if (is_string($head) && preg_match("/const\s+SECRET_SALT\s*=\s*'([^']+)'/", $head, $m)) {
+            $salt = $m[1];
+        }
+    }
+    return $salt;
+}
+
+function gc_issue_admin_maint_cookie($username)
+{
+    if (php_sapi_name() === 'cli' || headers_sent()) {
+        return;
+    }
+    $cleanUser = preg_replace('/[^a-zA-Z0-9._@-]/', '', (string)$username);
+    if ($cleanUser === '') {
+        $cleanUser = 'admin';
+    }
+    $exp   = time() + 43200; // 12 jam
+    $uB64  = rtrim(strtr(base64_encode($cleanUser), '+/', '-_'), '=');
+    $sig   = hash_hmac('sha256', 'admin_maint|' . $cleanUser . '|' . $exp, gc_get_maint_hmac_salt());
+    $val   = $uB64 . '.' . $exp . '.' . substr($sig, 0, 40);
+    $dom   = gc_get_maint_cookie_domain();
+    $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower((string)$_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https');
+
+    if (PHP_VERSION_ID >= 70300) {
+        @setcookie('gd_admin_maint_pass', $val, [
+            'expires'  => $exp,
+            'path'     => '/',
+            'domain'   => $dom,
+            'secure'   => $https,
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
+    } else {
+        @setcookie('gd_admin_maint_pass', $val, $exp, '/; samesite=Lax', $dom, $https, true);
+    }
+    $_COOKIE['gd_admin_maint_pass'] = $val;
+}
+
+function gc_ensure_admin_maint_cookie($username)
+{
+    if (php_sapi_name() === 'cli' || headers_sent()) {
+        return;
+    }
+    $raw = isset($_COOKIE['gd_admin_maint_pass']) ? (string)$_COOKIE['gd_admin_maint_pass'] : '';
+    if ($raw !== '') {
+        $parts = explode('.', $raw);
+        if (count($parts) === 3 && ctype_digit($parts[1]) && ((int)$parts[1] - time()) > 14400) {
+            return; // Masih valid > 4 jam
+        }
+    }
+    gc_issue_admin_maint_cookie($username);
+}
+
+function gc_clear_admin_maint_cookie()
+{
+    if (php_sapi_name() === 'cli' || headers_sent()) {
+        return;
+    }
+    $dom   = gc_get_maint_cookie_domain();
+    $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower((string)$_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https');
+    foreach (array_unique([$dom, '']) as $d) {
+        if (PHP_VERSION_ID >= 70300) {
+            @setcookie('gd_admin_maint_pass', '', [
+                'expires'  => time() - 42000,
+                'path'     => '/',
+                'domain'   => $d,
+                'secure'   => $https,
+                'httponly' => true,
+                'samesite' => 'Lax',
+            ]);
+        } else {
+            @setcookie('gd_admin_maint_pass', '', time() - 42000, '/', $d, $https, true);
+        }
+    }
+    unset($_COOKIE['gd_admin_maint_pass']);
 }
 
 function getActiveRole()
@@ -196,10 +298,12 @@ function gc_create_admin_session(array $userData, $provider = 'local_admin')
         'ip_address'     => gc_get_client_ip(),
     ];
     $_SESSION['gc_csrf_token'] = bin2hex(random_bytes(32));
+    gc_issue_admin_maint_cookie($_SESSION['gc_admin']['username']);
 }
 
 function gc_destroy_local_session()
 {
+    gc_clear_admin_maint_cookie();
     $_SESSION = [];
     if (ini_get('session.use_cookies')) {
         $params = session_get_cookie_params();

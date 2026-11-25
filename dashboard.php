@@ -12,7 +12,7 @@
 require_once __DIR__ . '/auth.php';
 requireAdminAuth();
 
-$validTabs = ['waf', 'firewall', 'incidents', 'server', 'errors', 'visitors', 'fim', 'settings'];
+$validTabs = ['waf', 'firewall', 'incidents', 'maintenance', 'server', 'errors', 'visitors', 'fim', 'settings'];
 $activeTab = isset($_GET['tab']) ? strtolower(trim((string)$_GET['tab'])) : 'waf';
 if (!in_array($activeTab, $validTabs, true)) {
     $activeTab = 'waf';
@@ -29,7 +29,7 @@ require_once BASE_PATH . '/includes/header.php';
     <button type="button" class="curriculum-tab-btn <?= $activeTab === 'waf' ? 'is-active' : '' ?>" data-gc-tab="waf">
         <iconify-icon icon="solar:shield-star-bold" width="17"></iconify-icon>
         <span>WAF &amp; Policy</span>
-        <span class="curriculum-tab-counter" id="cntTabWaf">12.0</span>
+        <span class="curriculum-tab-counter" id="cntTabWaf">11.0</span>
     </button>
     <button type="button" class="curriculum-tab-btn <?= $activeTab === 'firewall' ? 'is-active' : '' ?>" data-gc-tab="firewall">
         <iconify-icon icon="solar:forbidden-circle-bold" width="17"></iconify-icon>
@@ -40,6 +40,11 @@ require_once BASE_PATH . '/includes/header.php';
         <iconify-icon icon="solar:danger-triangle-bold" width="17"></iconify-icon>
         <span>Insiden</span>
         <span class="curriculum-tab-counter" id="cntTabIncidents">0</span>
+    </button>
+    <button type="button" class="curriculum-tab-btn <?= $activeTab === 'maintenance' ? 'is-active' : '' ?>" data-gc-tab="maintenance">
+        <iconify-icon icon="solar:tuning-square-2-bold" width="17"></iconify-icon>
+        <span>Maintenance Web</span>
+        <span class="curriculum-tab-counter" id="cntTabMaint">0</span>
     </button>
     <button type="button" class="curriculum-tab-btn <?= $activeTab === 'server' ? 'is-active' : '' ?>" data-gc-tab="server">
         <iconify-icon icon="solar:server-square-bold" width="17"></iconify-icon>
@@ -75,7 +80,7 @@ require_once BASE_PATH . '/includes/header.php';
         <div class="gc-kpi-card">
             <div>
                 <div class="gc-kpi-label">Engine WAF Aktif</div>
-                <div class="gc-kpi-val" id="wafPatchCode">New-Patch.12.0</div>
+                <div class="gc-kpi-val" id="wafPatchCode">New-Patch.11.0</div>
                 <div class="gc-kpi-sub" id="wafPolicyStatus">Memuat status bridge...</div>
             </div>
             <div class="gc-kpi-icon navy"><iconify-icon icon="solar:shield-check-bold"></iconify-icon></div>
@@ -309,6 +314,87 @@ require_once BASE_PATH . '/includes/header.php';
                 </tbody>
             </table>
         </div>
+    </div>
+</section>
+
+<!-- ========================================================================== -->
+<!-- TAB 3.5: PER-WEBSITE & GLOBAL MAINTENANCE CONTROL CENTER (1-TEMA 503)      -->
+<!-- ========================================================================== -->
+<section id="panel-maintenance" class="gc-tab-panel <?= $activeTab === 'maintenance' ? 'is-active' : '' ?>">
+    <div class="gc-card gc-maint-command">
+        <div class="gc-card-head">
+            <div>
+                <h2 class="gc-card-title">
+                    <iconify-icon icon="solar:tuning-square-2-bold"></iconify-icon>
+                    Kontrol Mode Maintenance Ekosistem (*.ilmuna.my.id)
+                </h2>
+                <div class="gc-maint-admin-banner" id="maintAdminPassBanner">
+                    <span class="dot"></span>
+                    <span id="maintAdminPassText">Sesi Admin aktif di <strong>.ilmuna.my.id</strong> — Anda tetap bisa mengakses &amp; mengerjakan website saat Maintenance, sedangkan selain Admin otomatis melihat halaman 503.</span>
+                </div>
+            </div>
+            <div class="gc-toolbar" style="margin:0;">
+                <button type="button" class="gc-btn gc-btn-ghost gc-btn-sm" onclick="GC.openMaintPreview('__global__')">
+                    <iconify-icon icon="solar:eye-bold" width="16"></iconify-icon> Preview Global
+                </button>
+                <button type="button" class="gc-btn gc-btn-gold gc-btn-sm" onclick="GC.openMaintGlobalModal()">
+                    <iconify-icon icon="solar:settings-minimalistic-bold" width="16"></iconify-icon> Pengaturan Global
+                </button>
+                <button type="button" class="gc-btn gc-btn-primary gc-btn-sm" onclick="GC.openAddMaintSiteModal()">
+                    <iconify-icon icon="solar:add-circle-bold" width="16"></iconify-icon> Tambah Subdomain
+                </button>
+            </div>
+        </div>
+
+        <div class="gc-maint-master-grid">
+            <div class="gc-switch-item gc-maint-global-box" id="maintGlobalBox">
+                <div>
+                    <div class="gc-switch-title" style="display:flex;align-items:center;gap:7px;">
+                        <iconify-icon icon="solar:danger-circle-bold" width="18" style="color:#F59E0B"></iconify-icon>
+                        <span>Global Maintenance (Semua Website)</span>
+                    </div>
+                    <div class="gc-switch-desc">Aktifkan mode 503 serentak di seluruh <code>*.ilmuna.my.id</code>. Panel <code>guardian-dome.ilmuna.my.id</code> selalu kebal terkunci.</div>
+                </div>
+                <label class="gc-toggle is-danger">
+                    <input type="checkbox" id="sw_maint_global_enabled" onchange="GC.toggleGlobalMaintenance(this.checked)">
+                    <span class="gc-toggle-slider"></span>
+                </label>
+            </div>
+
+            <div class="gc-switch-item">
+                <div>
+                    <div class="gc-switch-title" style="display:flex;align-items:center;gap:7px;">
+                        <iconify-icon icon="solar:shield-user-bold" width="18" style="color:#0D7A87"></iconify-icon>
+                        <span>Bypass Otomatis Khusus Admin</span>
+                    </div>
+                    <div class="gc-switch-desc">Admin yang login di Guardian Control atau memakai Kunci Bypass dapat membuka situs secara penuh; selain Admin masuk Mode 503.</div>
+                </div>
+                <label class="gc-toggle">
+                    <input type="checkbox" id="sw_maint_allow_admin" checked onchange="GC.quickSaveMaintAccess()">
+                    <span class="gc-toggle-slider"></span>
+                </label>
+            </div>
+
+            <div class="gc-switch-item">
+                <div style="flex:1;min-width:0;">
+                    <div class="gc-switch-title" style="display:flex;align-items:center;gap:7px;">
+                        <iconify-icon icon="solar:key-minimalistic-square-bold" width="18" style="color:#1D3B5E"></iconify-icon>
+                        <span>Kunci Bypass Perangkat Lain</span>
+                    </div>
+                    <div class="gc-switch-desc" style="margin-bottom:6px;">Untuk membuka web dari HP/browser lain tanpa login Guardian Control terlebih dahulu.</div>
+                    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                        <code class="gc-badge gc-badge-navy gc-mono" id="maintBypassKeyBadge">?gd_maint_bypass=ilmuna2026</code>
+                        <button type="button" class="gc-btn gc-btn-ghost gc-btn-sm" onclick="GC.copyBypassParam()" style="min-height:30px;padding:3px 9px;font-size:0.74rem;">
+                            <iconify-icon icon="solar:copy-bold" width="14"></iconify-icon> Salin
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="gc-maint-grid" id="maintSitesGrid">
+        <div class="gc-card" style="text-align:center;padding:32px;color:var(--gc-muted);">Memuat daftar website ekosistem...</div>
     </div>
 </section>
 
@@ -783,6 +869,161 @@ require_once BASE_PATH . '/includes/header.php';
         <div class="ilm-modal-body" id="detailModalBody"></div>
         <div class="ilm-modal-footer" id="detailModalFooter">
             <button type="button" class="ilm-modal-btn ilm-modal-btn--ghost" onclick="GC.closeModal('gcDetailModal')">Tutup</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL EDIT / TAMBAH KONFIGURASI MAINTENANCE WEBSITE -->
+<div class="ilm-modal-backdrop" id="gcMaintSiteModal">
+    <div class="ilm-modal-dialog" style="max-width:580px;">
+        <div class="ilm-modal-header">
+            <div class="ilm-modal-header__brand">
+                <div class="ilm-modal-header__icon"><iconify-icon icon="solar:tuning-square-2-bold"></iconify-icon></div>
+                <div>
+                    <h3 class="ilm-modal-header__title" id="maintSiteModalTitle">Atur Halaman Maintenance</h3>
+                    <p class="ilm-modal-header__subtitle" id="maintSiteModalSub">Kustomisasi pesan, jadwal ETA, &amp; progres 1-Tema</p>
+                </div>
+            </div>
+            <button type="button" class="ilm-modal-header__close" onclick="GC.closeModal('gcMaintSiteModal')"><iconify-icon icon="solar:close-circle-bold"></iconify-icon></button>
+        </div>
+        <div class="ilm-modal-body">
+            <div style="display:grid;gap:12px;">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;">
+                    <div>
+                        <label style="display:block;font-size:0.8rem;font-weight:700;margin-bottom:4px;">Domain (*.ilmuna.my.id)</label>
+                        <input type="text" id="msHost" class="gc-input gc-mono" style="width:100%;" placeholder="contoh: ppdb.ilmuna.my.id">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:0.8rem;font-weight:700;margin-bottom:4px;">Nama / Label Layanan</label>
+                        <input type="text" id="msLabel" class="gc-input" style="width:100%;" placeholder="Portal PPDB Ilmuna">
+                    </div>
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.8rem;font-weight:700;margin-bottom:4px;">Judul Halaman Maintenance</label>
+                    <input type="text" id="msTitle" class="gc-input" style="width:100%;" maxlength="140" placeholder="Sedang Pemeliharaan Sistem">
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.8rem;font-weight:700;margin-bottom:4px;">Pesan untuk Pengunjung</label>
+                    <textarea id="msMessage" class="gc-input" style="width:100%;min-height:84px;resize:vertical;padding-top:10px;" maxlength="600"></textarea>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;">
+                    <div>
+                        <label style="display:block;font-size:0.8rem;font-weight:700;margin-bottom:4px;">Estimasi Selesai (ETA · Opsional)</label>
+                        <input type="datetime-local" id="msEta" class="gc-input" style="width:100%;">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:0.8rem;font-weight:700;margin-bottom:4px;">Progres (<span id="msProgVal">65</span>%)</label>
+                        <input type="range" id="msProgress" min="5" max="100" step="5" value="65" style="width:100%;margin-top:12px;" oninput="document.getElementById('msProgVal').textContent=this.value">
+                    </div>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;">
+                    <div>
+                        <label style="display:block;font-size:0.8rem;font-weight:700;margin-bottom:4px;">HTTP Retry-After (detik)</label>
+                        <input type="number" id="msRetryAfter" class="gc-input" style="width:100%;" min="60" max="86400" value="1800">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:0.8rem;font-weight:700;margin-bottom:4px;">Email Kontak Layanan</label>
+                        <input type="email" id="msEmail" class="gc-input" style="width:100%;" value="admin@ilmuna.my.id">
+                    </div>
+                </div>
+                <label style="display:flex;align-items:center;gap:8px;font-size:0.83rem;font-weight:600;cursor:pointer;">
+                    <input type="checkbox" id="msAutoEnd" checked>
+                    <span>Otomatis selesai &amp; buka akses publik saat waktu ETA tercapai</span>
+                </label>
+            </div>
+        </div>
+        <div class="ilm-modal-footer">
+            <button type="button" class="ilm-modal-btn ilm-modal-btn--ghost" onclick="GC.closeModal('gcMaintSiteModal')">Batal</button>
+            <button type="button" class="ilm-modal-btn ilm-modal-btn--primary" onclick="GC.submitMaintSiteConfig()">Simpan Konfigurasi</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL PENGATURAN GLOBAL MAINTENANCE & AKSES ADMIN -->
+<div class="ilm-modal-backdrop" id="gcMaintGlobalModal">
+    <div class="ilm-modal-dialog" style="max-width:560px;">
+        <div class="ilm-modal-header">
+            <div class="ilm-modal-header__brand">
+                <div class="ilm-modal-header__icon"><iconify-icon icon="solar:shield-keyhole-bold"></iconify-icon></div>
+                <div>
+                    <h3 class="ilm-modal-header__title">Pengaturan Global &amp; Akses Admin</h3>
+                    <p class="ilm-modal-header__subtitle">Pesan global, kunci bypass, &amp; kontak WhatsApp</p>
+                </div>
+            </div>
+            <button type="button" class="ilm-modal-header__close" onclick="GC.closeModal('gcMaintGlobalModal')"><iconify-icon icon="solar:close-circle-bold"></iconify-icon></button>
+        </div>
+        <div class="ilm-modal-body">
+            <div style="display:grid;gap:12px;">
+                <div>
+                    <label style="display:block;font-size:0.8rem;font-weight:700;margin-bottom:4px;">Judul Global Maintenance</label>
+                    <input type="text" id="mgTitle" class="gc-input" style="width:100%;" maxlength="140">
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.8rem;font-weight:700;margin-bottom:4px;">Pesan Global untuk Seluruh Ekosistem</label>
+                    <textarea id="mgMessage" class="gc-input" style="width:100%;min-height:80px;resize:vertical;padding-top:10px;" maxlength="600"></textarea>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;">
+                    <div>
+                        <label style="display:block;font-size:0.8rem;font-weight:700;margin-bottom:4px;">ETA Global (Opsional)</label>
+                        <input type="datetime-local" id="mgEta" class="gc-input" style="width:100%;">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:0.8rem;font-weight:700;margin-bottom:4px;">Progres Global (<span id="mgProgVal">70</span>%)</label>
+                        <input type="range" id="mgProgress" min="5" max="100" step="5" value="70" style="width:100%;margin-top:12px;" oninput="document.getElementById('mgProgVal').textContent=this.value">
+                    </div>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;">
+                    <div>
+                        <label style="display:block;font-size:0.8rem;font-weight:700;margin-bottom:4px;">Kunci Bypass Admin</label>
+                        <input type="text" id="mgBypassKey" class="gc-input gc-mono" style="width:100%;" placeholder="ilmuna2026">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:0.8rem;font-weight:700;margin-bottom:4px;">Nomor WhatsApp Admin (628...)</label>
+                        <input type="text" id="mgWhatsapp" class="gc-input gc-mono" style="width:100%;" placeholder="6285117100227">
+                    </div>
+                </div>
+                <label style="display:flex;align-items:center;gap:8px;font-size:0.83rem;font-weight:600;cursor:pointer;">
+                    <input type="checkbox" id="mgAllowAdmin" checked>
+                    <span>Izinkan Admin (Sesi Guardian Control &amp; Kunci Bypass) mengakses web saat maintenance</span>
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;font-size:0.83rem;font-weight:600;cursor:pointer;">
+                    <input type="checkbox" id="mgAllowIpWl">
+                    <span>Izinkan juga IP Whitelist Firewall mengakses tanpa login (matikan jika ingin tes 503 di Incognito)</span>
+                </label>
+            </div>
+        </div>
+        <div class="ilm-modal-footer">
+            <button type="button" class="ilm-modal-btn ilm-modal-btn--ghost" onclick="GC.closeModal('gcMaintGlobalModal')">Batal</button>
+            <button type="button" class="ilm-modal-btn ilm-modal-btn--primary" onclick="GC.submitMaintGlobalOpts()">Simpan Pengaturan</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL LIVE PREVIEW 1-TEMA HALAMAN MAINTENANCE (DESKTOP / MOBILE) -->
+<div class="ilm-modal-backdrop" id="gcMaintPreviewModal">
+    <div class="ilm-modal-dialog" style="max-width:1080px;">
+        <div class="ilm-modal-header">
+            <div class="ilm-modal-header__brand">
+                <div class="ilm-modal-header__icon"><iconify-icon icon="solar:eye-bold"></iconify-icon></div>
+                <div>
+                    <h3 class="ilm-modal-header__title" id="maintPreviewTitle">Live Preview 1-Tema Maintenance</h3>
+                    <p class="ilm-modal-header__subtitle" id="maintPreviewSub">Tampilan persis yang dilihat pengunjung non-admin (HTTP 503)</p>
+                </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;">
+                <button type="button" class="gc-pill-btn is-active" data-prev-vp="desktop" onclick="GC.setMaintPreviewViewport('desktop')">Desktop</button>
+                <button type="button" class="gc-pill-btn" data-prev-vp="mobile" onclick="GC.setMaintPreviewViewport('mobile')">Mobile 375px</button>
+                <button type="button" class="ilm-modal-header__close" onclick="GC.closeModal('gcMaintPreviewModal')"><iconify-icon icon="solar:close-circle-bold"></iconify-icon></button>
+            </div>
+        </div>
+        <div class="ilm-modal-body" style="padding:14px;background:#E2E8F0;">
+            <div class="gc-preview-stage" id="maintPreviewStage">
+                <iframe id="maintPreviewIframe" class="gc-preview-iframe" title="Preview Halaman Maintenance 1-Tema"></iframe>
+            </div>
+        </div>
+        <div class="ilm-modal-footer">
+            <a id="maintPreviewNewTab" href="#" target="_blank" rel="noopener" class="ilm-modal-btn ilm-modal-btn--ghost" style="text-decoration:none;">Buka di Tab Penuh ↗</a>
+            <button type="button" class="ilm-modal-btn ilm-modal-btn--primary" onclick="GC.closeModal('gcMaintPreviewModal')">Tutup Preview</button>
         </div>
     </div>
 </div>
