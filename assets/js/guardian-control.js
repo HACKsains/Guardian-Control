@@ -85,11 +85,26 @@
 
     function openModal(id) {
         var el = document.getElementById(id);
-        if (el) el.classList.add('is-open');
+        if (!el) return;
+        if (el.parentElement !== document.body) {
+            document.body.appendChild(el);
+        }
+        el.style.display = 'flex';
+        el.classList.add('is-open');
+        document.body.style.overflow = 'hidden';
     }
     function closeModal(id) {
         var el = document.getElementById(id);
-        if (el) el.classList.remove('is-open');
+        if (!el) return;
+        el.classList.remove('is-open');
+        setTimeout(function () {
+            if (!el.classList.contains('is-open')) {
+                el.style.display = 'none';
+            }
+        }, 240);
+        if (!document.querySelector('.ilm-modal-backdrop.is-open')) {
+            document.body.style.overflow = '';
+        }
     }
 
     // ==========================================================================
@@ -1590,6 +1605,13 @@
     }
 
     function initShell() {
+        // 0. Portal semua modal langsung ke <body> agar bebas stacking context sidebar/header (center 100% & z-index tertinggi)
+        document.querySelectorAll('.ilm-modal-backdrop').forEach(function (m) {
+            if (m.parentElement !== document.body) {
+                document.body.appendChild(m);
+            }
+        });
+
         // 1. Entry radial wave curtain sweep-out (1:1 SSO & Learn)
         var entrySlide = document.getElementById('entrySlide');
         if (entrySlide) {

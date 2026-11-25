@@ -144,7 +144,6 @@ html.gc-dark .gc-select {
     box-sizing: border-box;
     overflow-x: hidden;
     position: relative;
-    z-index: 2;
 }
 
 /* ==============================================================================
@@ -910,6 +909,32 @@ html.gc-dark .gc-maint-msg-box {
     border: 6px solid #1E3552;
     border-radius: 28px;
     box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+}
+
+/* Modal Centering & Topmost Stacking Guarantee (di atas sidebar, header & WAF badge, di bawah alert.js) */
+body > .ilm-modal-backdrop,
+.ilm-modal-backdrop {
+    position: fixed !important;
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100dvh !important;
+    margin: 0 !important;
+    padding: 18px !important;
+    z-index: 100500 !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+.ilm-modal-backdrop .ilm-modal-dialog {
+    margin: 0 auto !important;
+}
+.ilm-modal-backdrop .gc-input,
+.ilm-modal-backdrop .gc-select {
+    background: #FFFFFF !important;
+    color: #0F1D2F !important;
+    border-color: #CBD5E1 !important;
 }
 
 /* Mobile 360px+ Safety */

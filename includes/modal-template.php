@@ -48,13 +48,19 @@ $ornamentDivider = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'
  * ============================================================================== */
 .ilm-modal-backdrop {
     position: fixed !important;
-    inset: 0 !important;
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100dvh !important;
+    margin: 0 !important;
     background: rgba(15, 29, 47, 0.65) !important;
     backdrop-filter: blur(8px) !important;
     -webkit-backdrop-filter: blur(8px) !important;
     align-items: center !important;
     justify-content: center !important;
-    z-index: 10500 !important;
+    z-index: 100500 !important;
     display: none !important;
     opacity: 0 !important;
     pointer-events: none !important;
@@ -796,6 +802,9 @@ function openIlmunaModal(modalId) {
     const cleanId = modalId.replace(/^#/, '');
     const modal = document.getElementById(cleanId) || document.querySelector(modalId.startsWith('#') ? modalId : '#' + modalId);
     if (!modal) return;
+    if (modal.parentElement !== document.body) {
+        document.body.appendChild(modal);
+    }
 
     modal.classList.add('ilm-modal-backdrop', 'is-open', 'show', 'active');
     modal.style.display = 'flex';
